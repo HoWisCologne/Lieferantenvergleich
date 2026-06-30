@@ -1554,7 +1554,7 @@ function todayISO(){ return new Date().toISOString().slice(0,10); }
 /* ---------------- Desktop-App: Update-Prüfung (Variante A) ----------------
    Fragt bei Start und per Button die neueste Version bei GitHub ab und zeigt
    bei einer neueren Version einen Hinweis mit Download-Link. */
-const GITHUB_REPO="DEIN-GITHUB-NAME/Lieferantenvergleich"; // <-- hier euren GitHub-Pfad eintragen (z. B. "wiskirchen/Lieferantenvergleich")
+const GITHUB_REPO="HoWisCologne/Lieferantenvergleich"; // GitHub-Pfad (owner/repo) für die Update-Prüfung
 let APP_VERSION="1.0.0"; // wird in der Desktop-App durch die echte App-Version ersetzt
 function currentVersion(){ return APP_VERSION; }
 function isDesktop(){ return !!(window.appAPI && window.appAPI.isDesktop); }

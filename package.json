@@ -40,7 +40,7 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "DEIN-GITHUB-NAME",
+        "owner": "HoWisCologne",
         "repo": "Lieferantenvergleich"
       }
     ]

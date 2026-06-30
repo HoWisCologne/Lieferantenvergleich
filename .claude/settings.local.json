@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"import openpyxl; print\\('openpyxl ok'\\)\")",
+      "Bash(python3)",
+      "Bash(python3 build_seed.py)",
+      "mcp__Claude_Preview__preview_start",
+      "Read(//Users/pc/Claude/Projects/**)",
+      "Bash(python3 -c ' *)",
+      "WebSearch",
+      "Bash(perl -0pi -e 's/<details class=\"sysgroup\" open>/<details class=\"sysgroup\">/g' index.html)",
+      "Bash(grep -n '${subSelect}' index.html)",
+      "Bash(node --check main.js)",
+      "Bash(node --check preload.js)",
+      "Bash(python3 -c \"import json;json.load\\(open\\('package.json'\\)\\);print\\('package.json OK'\\)\")",
+      "Bash(python3 -c \"import json;print\\('files:',[f for f in ['index.html','seed.js','main.js','preload.js','package.json','.github/workflows/release.yml','.gitignore'] if __import__\\('os'\\).path.exists\\(f\\)]\\)\")"
+    ]
+  }
+}

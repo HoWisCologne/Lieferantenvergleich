@@ -1,0 +1,1681 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lieferantenvergleich – Materialpreise</title>
+<script>
+  // Theme früh anwenden, um Aufblitzen zu vermeiden
+  (function(){
+    try{
+      var t=localStorage.getItem("lv_theme")||"auto";
+      var dark = t==="dark" || (t==="auto" && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
+      if(dark) document.documentElement.classList.add("dark");
+    }catch(e){}
+  })();
+</script>
+<script src="seed.js"></script>
+<style>
+  :root{
+    --bg:#f4f6f8; --panel:#ffffff; --ink:#1f2933; --muted:#6b7785;
+    --line:#e3e8ee; --brand:#1f6feb; --brand-d:#1657c4;
+    --green:#e6f6ec; --green-ink:#137333; --red:#fde8e8; --red-ink:#c5221f;
+    --amber:#fff4e5; --warn-ink:#b25e00;
+    --th-bg:#fafbfc; --hover:#fafcff; --input-bg:#ffffff; --overlay:rgba(16,24,40,.45);
+    --shadow:0 1px 3px rgba(16,24,40,.08),0 1px 2px rgba(16,24,40,.06);
+  }
+  html.dark{
+    --bg:#16191d; --panel:#20242b; --ink:#e6e9ed; --muted:#99a3af;
+    --line:#333a43; --brand:#4f8ef7; --brand-d:#3f7de0;
+    --green:#15361e; --green-ink:#5fd081; --red:#3a1d1d; --red-ink:#f08a86;
+    --amber:#3a2f18; --warn-ink:#e0a042;
+    --th-bg:#1b1f25; --hover:#262b33; --input-bg:#1b1f25; --overlay:rgba(0,0,0,.6);
+    --shadow:0 1px 3px rgba(0,0,0,.45),0 1px 2px rgba(0,0,0,.4);
+  }
+  html.dark{color-scheme:dark}
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       background:var(--bg);color:var(--ink)}
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:10px 18px;
+         display:flex;align-items:center;gap:18px;position:sticky;top:0;z-index:20}
+  header h1{font-size:16px;margin:0;font-weight:700;white-space:nowrap}
+  nav{display:flex;gap:4px;flex-wrap:wrap}
+  nav button{background:transparent;border:0;padding:8px 14px;border-radius:7px;cursor:pointer;
+             color:var(--muted);font-weight:600;font-size:13px}
+  nav button:hover{background:var(--bg);color:var(--ink)}
+  nav button.active{background:var(--brand);color:#fff}
+  .spacer{flex:1}
+  .tools{display:flex;gap:6px}
+  main{padding:18px;max-width:1500px;margin:0 auto}
+  .btn{background:var(--brand);color:#fff;border:0;padding:8px 14px;border-radius:7px;cursor:pointer;
+       font-weight:600;font-size:13px}
+  .btn:hover{background:var(--brand-d)}
+  .btn.ghost{background:var(--panel);color:var(--ink);border:1px solid var(--line)}
+  .btn.ghost:hover{background:var(--bg)}
+  .btn.danger{background:#fff;color:var(--red-ink);border:1px solid #f3c2c0}
+  .btn.danger:hover{background:var(--red)}
+  .btn.sm{padding:5px 9px;font-size:12px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow)}
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  input[type=text],input[type=number],input[type=date],select,textarea{
+    font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:var(--input-bg);color:var(--ink)}
+  input:focus,select:focus,textarea:focus{outline:2px solid #cfe0ff;border-color:var(--brand)}
+  label.field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:600}
+  label.field input,label.field select,label.field textarea{color:var(--ink);font-weight:400}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--th-bg);font-weight:700;color:var(--muted);font-size:12px;text-transform:uppercase;
+     letter-spacing:.02em;position:sticky;top:0;z-index:5}
+  tbody tr:hover{background:var(--hover)}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .price{font-variant-numeric:tabular-nums;white-space:nowrap;cursor:pointer;border-radius:5px;padding:3px 6px;display:inline-block}
+  .price:hover{outline:1px solid var(--line)}
+  .cheap{background:var(--green);color:var(--green-ink);font-weight:700}
+  .exp{background:var(--red);color:var(--red-ink)}
+  .muted{color:var(--muted)}
+  .tag{display:inline-block;background:var(--bg);border:1px solid var(--line);border-radius:20px;
+       padding:1px 9px;font-size:12px;color:var(--muted)}
+  .pill{display:inline-block;padding:1px 8px;border-radius:20px;font-size:11px;font-weight:700}
+  .right{text-align:right}
+  .nowrap{white-space:nowrap}
+  .empty{padding:40px;text-align:center;color:var(--muted)}
+  .stat{display:flex;gap:22px;flex-wrap:wrap;margin-bottom:14px}
+  .stat .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 16px;box-shadow:var(--shadow);min-width:120px}
+  .stat .n{font-size:22px;font-weight:800}
+  .stat .l{font-size:12px;color:var(--muted);font-weight:600}
+  /* modal */
+  .overlay{position:fixed;inset:0;background:var(--overlay);display:flex;align-items:flex-start;
+           justify-content:center;padding:40px 16px;z-index:50;overflow:auto}
+  .modal{background:var(--panel);border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,.3);width:100%;max-width:640px}
+  .modal header{position:static;border-bottom:1px solid var(--line);justify-content:space-between}
+  .modal .body{padding:18px;display:flex;flex-direction:column;gap:14px}
+  .modal .foot{padding:14px 18px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
+  .x{background:none;border:0;font-size:22px;cursor:pointer;color:var(--muted);line-height:1}
+  .hist-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line)}
+  .badge-new{background:var(--brand);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px}
+  .delta-up{color:var(--red-ink)} .delta-dn{color:var(--green-ink)}
+  .chiprow{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{display:flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--line);
+        border-radius:20px;padding:3px 6px 3px 12px;font-size:13px}
+  .chip button{border:0;background:none;cursor:pointer;color:var(--muted);font-size:15px}
+  .src-note{font-size:12px;color:var(--muted);margin-top:4px}
+  a.link{color:var(--brand);cursor:pointer;text-decoration:none;font-weight:600}
+  a.link:hover{text-decoration:underline}
+  .scroll{overflow:auto;border-radius:10px}
+  .scroll.tall{max-height:calc(100vh - 250px)}
+  /* segmentierte Umschaltung */
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{border:0;background:var(--panel);padding:7px 12px;cursor:pointer;font-weight:600;font-size:12px;color:var(--muted)}
+  .seg button+button{border-left:1px solid var(--line)}
+  .seg button:hover{background:var(--bg);color:var(--ink)}
+  .seg button.on{background:var(--brand);color:#fff}
+  /* Kartenansicht Vergleich */
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+  .vcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:12px 14px}
+  .vcard-h{font-weight:700;line-height:1.3}
+  .vcard-h .muted{font-weight:400}
+  .vrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line)}
+  .vrow:last-of-type{border-bottom:0}
+  .vlief{color:var(--muted);font-weight:600}
+  .vcard-f{margin-top:10px;padding-top:8px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center}
+  .vprice{display:flex;flex-direction:column;align-items:flex-end;gap:1px;white-space:nowrap}
+  .vprice-main{display:flex;align-items:center;gap:3px}
+  .vdelta{color:var(--red-ink);font-size:11px;font-weight:700;margin-left:4px}
+  .pdate{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums;line-height:1.2;font-weight:400}
+  .pdate.old{color:var(--warn-ink)}
+  .artlink{cursor:pointer;border-bottom:1px dotted var(--muted)}
+  .artlink:hover{color:var(--brand);border-bottom-color:var(--brand)}
+  .btn.addprice{color:var(--brand);border-color:var(--brand);border-style:dashed}
+  .btn.addprice:hover{background:var(--brand);color:#fff}
+  .addhere{cursor:pointer;color:var(--brand);font-weight:600;font-size:12px;
+    border:1px dashed var(--brand);border-radius:6px;padding:2px 7px;white-space:nowrap;display:inline-block}
+  .addhere:hover{background:var(--brand);color:#fff}
+  /* Update-Hinweisleiste */
+  #updatebar{display:none;position:fixed;top:0;left:0;right:0;z-index:9600;
+    align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
+    background:var(--brand);color:#fff;font-weight:600;padding:9px 14px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+  #updatebar.show{display:flex}
+  #updatebar .btn.sm{background:#fff;color:var(--brand)}
+  #updatebar .btn.ghost.sm{background:transparent;color:#fff;border-color:rgba(255,255,255,.6)}
+  /* PDF-/Druck-Bereich (Preisanfrage) */
+  #printArea{position:fixed;left:-99999px;top:0}
+  .pa-doc{color:#000;font-size:12px}
+  .pa-doc h1{font-size:18px;margin:0 0 2px}
+  .pa-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:10px}
+  .pa-intro{margin:0 0 12px;font-size:12px;line-height:1.5}
+  .pa-doc table{border-collapse:collapse;width:100%;font-size:11.5px}
+  .pa-doc th,.pa-doc td{border:1px solid #999;padding:5px 7px;text-align:left;vertical-align:top}
+  .pa-doc thead th{background:#eee;font-weight:700}
+  .pa-doc tr.pa-cat td{background:#ddd;font-weight:700}
+  .pa-num{white-space:nowrap}
+  .pa-foot{margin-top:14px;font-size:11px;color:#333}
+  @media print{
+    @page{margin:16mm}
+    html.dark{color-scheme:light}
+    body{background:#fff}
+    body * {visibility:hidden}
+    #printArea,#printArea *{visibility:visible}
+    #printArea{position:absolute;left:0;top:0;width:100%}
+    .devbar,.selbar{display:none !important}
+    .pa-doc tr{page-break-inside:avoid}
+    .pa-doc tr.pa-cat{page-break-after:avoid}
+  }
+  /* Mehrfachauswahl */
+  .selbox{width:16px;height:16px;cursor:pointer;flex:none;vertical-align:middle;accent-color:var(--brand)}
+  .vcard-h .selbox{margin-right:7px}
+  details.subgroup>summary .selall{margin-right:4px;cursor:pointer;accent-color:var(--brand)}
+  th.selcol,td.selcol{width:30px;text-align:center}
+  tr.selrow>td{background:color-mix(in srgb,var(--brand) 12%,transparent)}
+  .vcard.selrow{outline:2px solid var(--brand);outline-offset:-1px}
+  .selbar{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:9500;display:none;
+    align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 6px 22px rgba(0,0,0,.3);
+    padding:8px 12px;max-width:calc(100vw - 28px)}
+  .selbar .selinfo{font-weight:600}
+  .selbar .selinfo strong{color:var(--brand)}
+  .cheap-pill{background:var(--green);color:var(--green-ink);font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;margin-left:6px;white-space:nowrap}
+  .vrow.best{margin:0 -8px;padding-left:8px;padding-right:8px;border-radius:7px;background:var(--green)}
+  .vrow.best .vlief{color:var(--green-ink)}
+  .vrow.miss{opacity:.6}
+  /* Unterkategorie-Überschriften */
+  .subhead{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;color:var(--ink);
+    margin:16px 2px 8px;padding-bottom:5px;border-bottom:2px solid var(--brand)}
+  .subhead .cnt{color:var(--muted);font-weight:600;font-size:12px}
+  .cards+.subhead{margin-top:20px}
+  tr.subhead-row td{background:var(--th-bg);font-weight:700;color:var(--ink);
+    border-bottom:2px solid var(--brand);font-size:12px}
+  /* Aufklappbare Rohrsystem-Gruppen (PVC-KG / KG 2000) */
+  details.sysgroup{border:1px solid var(--line);border-radius:10px;margin:12px 0;
+    background:var(--panel);box-shadow:var(--shadow);overflow:hidden}
+  details.sysgroup>summary{cursor:pointer;list-style:none;padding:12px 14px;font-weight:800;font-size:15px;
+    background:var(--th-bg);display:flex;align-items:center;gap:9px}
+  details.sysgroup[open]>summary{border-bottom:1px solid var(--line)}
+  details.sysgroup>summary::-webkit-details-marker{display:none}
+  details.sysgroup>summary::before{content:"▸";color:var(--brand);font-size:13px;transition:transform .15s}
+  details.sysgroup[open]>summary::before{transform:rotate(90deg)}
+  details.sysgroup>summary .cnt{color:var(--muted);font-weight:600;font-size:12px}
+  .sysbody{padding:6px 12px 12px}
+  .sysbody .subhead:first-child{margin-top:8px}
+  /* Aufklappbare Unterkategorie-Gruppen (DN / Bauteiltyp) – standardmäßig zugeklappt */
+  details.subgroup{margin:10px 0 0}
+  details.subgroup>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;
+    font-weight:700;font-size:13px;color:var(--ink);margin:0 2px 8px;padding-bottom:5px;
+    border-bottom:2px solid var(--brand)}
+  details.subgroup>summary::-webkit-details-marker{display:none}
+  details.subgroup>summary::before{content:"▸";color:var(--brand);font-size:11px;flex:none;transition:transform .15s}
+  details.subgroup[open]>summary::before{transform:rotate(90deg)}
+  details.subgroup>summary:hover{color:var(--brand)}
+  details.subgroup>summary .cnt{color:var(--muted);font-weight:600;font-size:12px}
+  /* Reihenfolge-Menü (Drag & Drop) */
+  .ord-item{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--line);
+    border-radius:8px;margin-bottom:6px;background:var(--panel);cursor:grab}
+  .ord-item.dragging{opacity:.45;border-style:dashed}
+  .ord-grip{color:var(--muted);cursor:grab;font-size:15px;letter-spacing:-2px}
+  .ord-label{flex:1;font-weight:600}
+  /* Listen-Ansicht (Artikel / Lieferanten) */
+  .list{background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);overflow:hidden}
+  .litem{border-bottom:1px solid var(--line)}
+  .litem:last-child{border-bottom:0}
+  .litem .lrow,.litem>summary{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:10px 14px}
+  .litem>summary{cursor:pointer;list-style:none}
+  .litem>summary::-webkit-details-marker{display:none}
+  .litem>summary::before{content:"▸";color:var(--brand);font-size:11px;flex:none;transition:transform .15s}
+  .litem[open]>summary::before{transform:rotate(90deg)}
+  .litem>summary:hover{background:var(--hover)}
+  .l-main{flex:1;min-width:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .l-meta{display:flex;align-items:center;gap:14px;white-space:nowrap;color:var(--muted);font-size:12px}
+  .l-body{padding:4px 14px 12px 30px;border-top:1px dashed var(--line)}
+  @media(max-width:560px){ .l-meta{gap:8px} .litem .lrow{flex-wrap:wrap} }
+  /* Artikelansicht als Karten */
+  .acards{display:grid;grid-template-columns:repeat(auto-fill,minmax(440px,1fr));gap:12px}
+  .acard{background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:12px 14px}
+  .acard-head{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start;
+              border-bottom:1px solid var(--line);padding-bottom:9px;margin-bottom:6px}
+  .btnrow{display:flex;gap:6px;flex-wrap:wrap}
+  .off{display:flex;justify-content:space-between;gap:6px 10px;flex-wrap:wrap;align-items:center;
+       padding:7px 0;border-bottom:1px dashed var(--line)}
+  .off:last-child{border-bottom:0}
+  .off-r{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+  /* Responsiv */
+  @media(max-width:820px){
+    header{flex-wrap:wrap;gap:8px 12px;padding:10px 12px;position:static}
+    header h1{font-size:15px}
+    nav{order:3;width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+    nav button{padding:7px 11px}
+    .tools{order:2;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
+    main{padding:12px}
+    .stat{gap:10px}
+    .stat .card{flex:1;min-width:calc(50% - 6px);padding:10px 12px}
+    .stat .n{font-size:18px}
+    .toolbar input[type=text]{min-width:0;flex:1}
+    .grid2,.grid3{grid-template-columns:1fr}
+    .scroll.tall{max-height:none}
+  }
+  @media(max-width:480px){
+    .cards{grid-template-columns:1fr}
+    .tools .btn.sm{flex:1}
+    nav button{flex:1;white-space:nowrap}
+  }
+  /* veralteter Preis */
+  .warn{color:var(--warn-ink);font-weight:700;cursor:help}
+  .price.stale{box-shadow:inset 0 0 0 1px var(--warn-ink)}
+  body{padding-bottom:14px}
+  /* Geräte-Vorschau (Auto/Handy/Tablet/Desktop) */
+  .devbar{position:fixed;right:14px;bottom:14px;z-index:9000;display:flex;align-items:center;gap:3px;
+    background:rgba(28,28,30,.95);border-radius:12px;padding:5px 7px;box-shadow:0 6px 22px rgba(0,0,0,.32)}
+  .devbar-lbl{color:#b8bcc4;font-size:10.5px;padding:0 6px 0 3px;letter-spacing:.02em}
+  .devbar button{font:inherit;color:#e8eaf0;background:transparent;border:1px solid transparent;border-radius:8px;
+    padding:5px 9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;line-height:1.15;font-size:12px;font-weight:600}
+  .devbar button small{font-size:9px;opacity:.55;margin-top:1px;font-weight:400}
+  .devbar button:hover{background:rgba(255,255,255,.12)}
+  .devbar button.active{background:var(--brand);color:#fff}
+  .devbar button.active small{opacity:.85}
+  .dev-overlay{position:fixed;inset:0;z-index:8000;background:#26262b;display:flex;align-items:center;
+    justify-content:center;overflow:auto;padding:22px 16px 96px}
+  .dev-stage{display:flex;flex-direction:column;align-items:center;gap:10px}
+  .dev-head{color:#cbcdd4;font-size:12px}
+  .dev-scaler{position:relative;flex:none}
+  .dev-frame{position:absolute;top:0;left:0;background:#fff;border-radius:22px;overflow:hidden;
+    box-shadow:0 14px 50px rgba(0,0,0,.5);border:7px solid #111114}
+  .dev-frame iframe{display:block;border:none}
+  @media(max-width:480px){ .devbar{right:8px;bottom:10px} .devbar-lbl{display:none} }
+</style>
+</head>
+<body>
+<header>
+  <h1>📊 Lieferantenvergleich</h1>
+  <nav id="nav"></nav>
+  <div class="spacer"></div>
+  <div class="tools">
+    <select id="themeSel" class="btn ghost sm" title="Darstellung" style="font-weight:600">
+      <option value="auto">🌓 Auto</option>
+      <option value="light">☀️ Hell</option>
+      <option value="dark">🌙 Dunkel</option>
+    </select>
+    <span class="seg" title="Daten sichern oder aus einer Datei wiederherstellen">
+      <button id="btnExport">💾 Sichern</button>
+      <button id="btnImport">↺ Wiederherstellen</button>
+    </span>
+    <input type="file" id="importFile" accept="application/json" style="display:none">
+  </div>
+</header>
+<div id="updatebar"></div>
+<main id="app"></main>
+<div id="modalRoot"></div>
+<div id="printArea"></div>
+
+<script>
+"use strict";
+/* ---------------- Datenhaltung ---------------- */
+const LS_KEY = "lieferantenvergleich_db_v1";
+let state = null;
+
+function normalize(s){
+  if(!s.settings) s.settings={};
+  if(s.settings.staleMonths==null) s.settings.staleMonths=6;
+  if(!Array.isArray(s.einheiten)) s.einheiten=["Stk."];
+  // Bauteil-Reihenfolge: fehlende Schlüssel ergänzen, unbekannte entfernen
+  if(!Array.isArray(s.settings.rohrOrder)) s.settings.rohrOrder=ROHR_KEYS.slice();
+  else{
+    for(const k of ROHR_KEYS) if(!s.settings.rohrOrder.includes(k)) s.settings.rohrOrder.push(k);
+    s.settings.rohrOrder=s.settings.rohrOrder.filter(k=>ROHR_KEYS.includes(k));
+  }
+  return s;
+}
+function loadDB(){
+  const raw = localStorage.getItem(LS_KEY);
+  let s=null; if(raw){ try{ s=JSON.parse(raw); }catch(e){} }
+  return normalize(s || seedClone());
+}
+function seedClone(){
+  const s = (window.SEED) ? JSON.parse(JSON.stringify(window.SEED)) :
+    {einheiten:["Stk.","Rolle","m","Sack"],lieferanten:[],artikel:[],angebote:[],preise:[]};
+  return s;
+}
+function saveDB(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+function uid(p){ return p+"_"+Math.random().toString(36).slice(2,10); }
+
+/* ---------------- Helfer ---------------- */
+const fmtEUR = n => (n==null||isNaN(n)) ? "–" :
+  n.toLocaleString("de-DE",{style:"currency",currency:"EUR"});
+const fmtDate = d => {
+  if(!d) return "—";
+  const x=new Date(d); if(isNaN(x)) return d;
+  return x.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"});
+};
+function byId(arr,id){ return arr.find(x=>x.id===id); }
+function lieferant(id){ return byId(state.lieferanten,id); }
+function artikel(id){ return byId(state.artikel,id); }
+
+function staleMonths(){ return (state.settings && state.settings.staleMonths) || 6; }
+function isStale(datum){
+  if(!datum) return true;
+  const d=new Date(datum); if(isNaN(d)) return true;
+  const cut=new Date(); cut.setMonth(cut.getMonth()-staleMonths());
+  return d<cut;
+}
+// Älter als 1 Jahr -> zählt nicht mehr als „bester Preis", wenn aktuellere vorliegen
+function tooOldForBest(datum){
+  if(!datum) return true;
+  const d=new Date(datum); if(isNaN(d)) return true;
+  const cut=new Date(); cut.setFullYear(cut.getFullYear()-1);
+  return d<cut;
+}
+
+function preiseFor(angebotId){
+  return state.preise.filter(p=>p.angebotId===angebotId)
+    .sort((a,b)=>(b.datum||"").localeCompare(a.datum||"") || b.id.localeCompare(a.id));
+}
+function aktPreis(angebotId){
+  const h=preiseFor(angebotId); return h.length?h[0]:null;
+}
+function angeboteFor(artikelId){ return state.angebote.filter(a=>a.artikelId===artikelId); }
+function angebotePerLieferant(lieferantId){ return state.angebote.filter(a=>a.lieferantId===lieferantId); }
+
+function artikelLabel(a){
+  const parts=[a.name];
+  const spec=[a.laenge,a.nennweite,a.grad].filter(x=>x&&String(x).trim()).join(" · ");
+  return spec?`${a.name} — ${spec}`:a.name;
+}
+function artikelSpec(a){
+  return [a.laenge,a.nennweite,a.grad].filter(x=>x&&String(x).trim()).join(" · ");
+}
+
+/* ---------------- Kategorien (grobe Überbegriffe) ---------------- */
+const KATEGORIEN=[
+  "Kanalrohre & Formstücke","Drainage & Dränage","Schächte & Schachtbauteile",
+  "Abdichtung, Folien & Noppenbahnen","Vliese & Geogitter",
+  "Bordsteine, Pflaster & Einfassungen","Beton, Zement & Mörtel",
+  "Erdung & Blitzschutz","Kabelschutz","Zubehör & Hilfsmittel",
+  "Verpackung, Fracht & Service","Sonstiges",
+];
+// Reihenfolge = Priorität (identisch zu build_seed.py)
+const KAT_REGELN=[
+  ["Verpackung, Fracht & Service",["palette","gitterbox","vorfracht","fracht","anfuhr","maut","lieferservice","kranservice","express","stückgut","stueckgut","palettengeb"]],
+  ["Erdung & Blitzschutz",["erder","erdungsband","ringerder","runddraht"]],
+  ["Kabelschutz",["kabuflex","kabel"]],
+  ["Abdichtung, Folien & Noppenbahnen",["folie","baufolie","noppenbahn","delta","nevobahn","nevo","terraxx","terrraxx","bitumen","dickbeschicht","dicktbeschicht"]],
+  ["Vliese & Geogitter",["vlies","geotextil","geotext","geovlies","geogitter","polyfelt","betex","tensar","begrid","galatex","evalith","wurzelvlies","unkrautvlies","ag 2 rolle","ag 5 rollen"]],
+  ["Drainage & Dränage",["opti-control","opti.control","opti control","opti-drän","opti-dran","opti drän","drän","dräna","draen","drainrohr","drainagerohr","drain-ff","kokofill","rngff"]],
+  ["Schächte & Schachtbauteile",["schacht","sx400","sx 400","awaschacht","auflagering","betondeckel","aufsetzrohr","asb","aufsatz","lichtschacht","teleskop","konus","steigeisen","sicherheitseisen"]],
+  ["Bordsteine, Pflaster & Einfassungen",["tiefboard","tiefbord","bordstein","randstein","rundboard","hochboard","beeteinfass","basaltin","pflaster","fugenband","board"]],
+  ["Beton, Zement & Mörtel",["zement","estrich","mörtel","moertel","mortel","trockenbeton","schnellbeton","schnellzement","trasszement","baumit","botament","remix","weber.rep","betonstahl","betonmischung","kalksandstein","beton"]],
+  ["Zubehör & Hilfsmittel",["gleitmittel","handschuh","plattennäg","plattennag","soudal","brunnenschaum","kraso","schlauchschell","schlauchverbind","reduzierring"]],
+  ["Kanalrohre & Formstücke",["kg2000","kg 2000","kg-","kgus","kgb","kgm","kgr","ht ","htr","htb","htea","ht-","rohr","bogen","abzweig","muffe","spitze","reduz","redu","überschieb","ueberschieb","verschlußdeckel","verschlussdeckel","veschlußdeckel","reinigungsrohr","rückstau","rueckstau","ruckstau","stopfen","steinzeug","tonmuffe","tonsp","kanalrohr","kanalr","pvc","aco"]],
+];
+function kategorieFor(name){
+  const n=" "+String(name||"").toLowerCase()+" ";
+  for(const [cat,keys] of KAT_REGELN){ for(const k of keys){ if(n.includes(k)) return cat; } }
+  return "Sonstiges";
+}
+// Effektive Kategorie: ausdrücklich gesetzte (gültige) Kategorie, sonst aus dem Namen abgeleitet
+function artKat(a){
+  return (a.kategorie && KATEGORIEN.includes(a.kategorie)) ? a.kategorie : kategorieFor(a.name);
+}
+// Vorhandene Unterkategorien einer Kategorie (aus den aktuellen Artikeln abgeleitet)
+function subcatsOf(kat){
+  return [...new Set(state.artikel.filter(a=>artKat(a)===kat).map(unterKat))].sort(subSort);
+}
+
+/* ---------------- Unterkategorien (zweite Ebene) ---------------- */
+// KG/HT-Rohre werden nominal über den Außendurchmesser benannt (110, 160, 315 …);
+// gearbeitet wird mit dem Innendurchmesser. Daher Außen -> Innen zusammenfassen.
+//   Außen 110 = DN 100 · 160 = DN 150 · 315 = DN 300 · 75 = DN 70 · 90 = DN 80
+const DN_AUSSEN_INNEN={75:70,90:80,110:100,160:150,315:300};
+// DN-Gruppe aus Nennweite/Länge (z. B. "NW 100" / "100/100" / "150/125" -> "DN 100").
+// Klammer-Zusätze wie "(VE/20 Stk.)" werden ignoriert, "NW/DN" bevorzugt.
+function dnGroup(a){
+  const s=((a.nennweite||"")+" "+(a.laenge||"")).replace(/\([^)]*\)/g," ");
+  let m=s.match(/(?:NW|DN)\s*(\d{2,4})/i);
+  if(!m) m=s.match(/(\d{2,4})/);
+  if(!m) return null;
+  let n=parseInt(m[1],10);
+  const cat=artKat(a);
+  if((cat==="Kanalrohre & Formstücke"||cat==="Drainage & Dränage") && DN_AUSSEN_INNEN[n]) n=DN_AUSSEN_INNEN[n];
+  return "DN "+n;
+}
+function unterKat(a){
+  if(a.unterkategorie) return a.unterkategorie;   // ausdrückliche Zuordnung hat Vorrang
+  const cat=artKat(a);
+  const n=(a.name||"").toLowerCase();
+  if(cat==="Kanalrohre & Formstücke"){
+    // Rückstau-Geräte sind nicht größenrelevant -> Sonstiges (keine Mini-DN-Gruppen)
+    if(n.includes("rückstau")||n.includes("rueckstau")||n.includes("ruckstau")) return "Sonstiges";
+    const dn=dnGroup(a); if(dn) return dn;
+    if(n.includes("steinzeug")||n.includes("tonmuffe")||n.includes("tonsp")||n.includes("ton")) return "Übergänge (Ton/Steinzeug)";
+    return "Sonstiges";
+  }
+  if(cat==="Kabelschutz"){ return dnGroup(a)||"Zubehör"; }
+  if(cat==="Drainage & Dränage"){
+    if(n.includes("schacht")||n.includes("opti-control")||n.includes("opti.control")) return "Dränage-Schächte";
+    if(n.includes("rohr")) return "Dränrohre";
+    return "Formteile & Zubehör";
+  }
+  if(cat==="Schächte & Schachtbauteile"){
+    if(n.includes("lichtschacht")) return "Lichtschächte";
+    if(n.includes("sx400")||n.includes("sx 400")||n.includes("awaschacht")||n.includes("awa")) return "Schachtsysteme (SX400/AWA)";
+    if(n.includes("konus")) return "Schachtkonus";
+    if(n.includes("auflagering")) return "Auflageringe";
+    if(n.includes("boden")) return "Schachtböden";
+    if(n.includes("abdeck")||n.includes("deckel")) return "Schachtabdeckungen";
+    if(n.includes("ring")||n.includes("hals")) return "Schachtringe";
+    if(n.includes("rohr")||n.includes("aufsatz")||n.includes("teleskop")) return "Schachtrohre & Aufsätze";
+    return "Sonstige Schachtteile";
+  }
+  if(cat==="Abdichtung, Folien & Noppenbahnen"){
+    if(n.includes("bitumen")||n.includes("beschicht")) return "Bitumen & Beschichtung";
+    if(n.includes("noppenbahn")||n.includes("delta-nb")||n.includes("nevobahn")||n.includes("nevo")) return "Noppenbahnen";
+    if(n.includes("geo-drain")||n.includes("terraxx")||n.includes("delta")||n.includes("drän")) return "Dränbahnen";
+    if(n.includes("folie")) return "Folien";
+    return "Sonstige";
+  }
+  if(cat==="Vliese & Geogitter"){
+    if(n.includes("geogitter")||n.includes("tensar")||n.includes("begrid")||n.includes("ga 30")) return "Geogitter";
+    if(n.includes("unkraut")||n.includes("wurzel")) return "Unkraut- & Wurzelvliese";
+    if(n.includes("filtervlies")||n.includes("filter")) return "Filtervliese";
+    return "Geotextilvliese";
+  }
+  if(cat==="Bordsteine, Pflaster & Einfassungen"){
+    if(n.includes("tiefbo")) return "Tiefborde";
+    if(n.includes("hochboard")||n.includes("rundboard")||n.includes("rundbo")||n.includes("absenker")) return "Hoch- & Rundborde";
+    if(n.includes("randstein")) return "Randsteine";
+    if(n.includes("pflaster")||n.includes("fugenband")||n.includes("beeteinfass")) return "Pflaster & Einfassungen";
+    return "Sonstige";
+  }
+  if(cat==="Beton, Zement & Mörtel"){
+    if(n.includes("estrich")) return "Estrich";
+    if(n.includes("betonstahl")) return "Bewehrung";
+    if(n.includes("mörtel")||n.includes("moertel")||n.includes("mortel")||n.includes("botament")) return "Mörtel";
+    if(n.includes("zement")) return "Zement";
+    return "Beton & Trockenbeton";
+  }
+  if(cat==="Erdung & Blitzschutz"){
+    if(n.includes("ringerder")) return "Ringerder";
+    if(n.includes("runddraht")) return "Runddraht";
+    if(n.includes("erdungsband")) return "Erdungsbänder";
+    return "Sonstige";
+  }
+  if(cat==="Zubehör & Hilfsmittel"){
+    if(n.includes("gleitmittel")) return "Gleitmittel";
+    if(n.includes("handschuh")) return "Arbeitsschutz";
+    return "Montage & Sonstiges";
+  }
+  if(cat==="Verpackung, Fracht & Service"){
+    if(n.includes("palette")||n.includes("gitterbox")) return "Paletten & Gitterboxen";
+    if(n.includes("fracht")||n.includes("anfuhr")||n.includes("maut")) return "Fracht & Anfuhr";
+    return "Service";
+  }
+  return "Allgemein";
+}
+function subSort(a,b){
+  const sa=/^sonstig/i.test(a), sb=/^sonstig/i.test(b);
+  if(sa!==sb) return sa?1:-1;            // "Sonstiges" immer ans Ende
+  return a.localeCompare(b,"de",{numeric:true});
+}
+
+/* ---------------- Bauteil-Sortierung der Kanalrohre ---------------- */
+// Standard-Reihenfolge (über das Reihenfolge-Menü anpassbar, gespeichert in settings.rohrOrder)
+const ROHR_TYPES=[
+  ["rohr","Rohre (Meterware)"],
+  ["bogen","Bögen"],
+  ["abzweiger","Abzweiger"],
+  ["ueberschiebmuffe","Überschiebmuffen"],
+  ["deckel","Deckel & Stopfen"],
+  ["reduzierung","Reduzierungen"],
+  ["muffe","Muffen & Spitzen"],
+  ["uebergang","Übergänge (Ton/Steinzeug)"],
+  ["reinigungsrohr","Reinigungsrohre"],
+  ["rueckstau","Rückstauklappen"],
+  ["sonstige","Sonstige"],
+];
+const ROHR_KEYS=ROHR_TYPES.map(t=>t[0]);
+function rohrLabel(k){ const t=ROHR_TYPES.find(x=>x[0]===k); return t?t[1]:k; }
+function rohrTyp(a){
+  const n=(a.name||"").toLowerCase();
+  if(n.includes("reinigungsrohr")) return "reinigungsrohr";
+  if(n.includes("rückstau")||n.includes("rueckstau")||n.includes("ruckstau")) return "rueckstau";
+  if(n.includes("übergang")||n.includes("uebergang")||n.includes("steinzeug")||n.includes("tonmuffe")||n.includes("tonsp")||n.includes("kgus")) return "uebergang";
+  if(n.includes("bogen")) return "bogen";
+  if(n.includes("abzweig")) return "abzweiger";
+  if(n.includes("überschieb")||n.includes("ueberschieb")) return "ueberschiebmuffe";
+  if(n.includes("deckel")||n.includes("stopfen")) return "deckel";
+  if(n.includes("redu")||n.includes("reduzier")) return "reduzierung";
+  if(n.includes("rohr")||n.includes("kanalr")) return "rohr";
+  if(n.includes("spitze")||n.includes("muffe")) return "muffe";
+  return "sonstige";
+}
+function rohrOrderIndex(key){
+  const ord=(state.settings&&state.settings.rohrOrder)||ROHR_KEYS;
+  const i=ord.indexOf(key); return i<0?999:i;
+}
+function parseLen(a){ const m=String(a.laenge||"").replace(",",".").match(/(\d+(?:\.\d+)?)/); return m?parseFloat(m[1]):1e9; }
+function parseGrad(a){ const m=String(a.grad||"").match(/(\d+)/); return m?parseInt(m[1],10):1e9; }
+// Vergleicht zwei Kanalrohr-Artikel: erst nach Bauteiltyp-Reihenfolge,
+// dann Rohre nach Länge (kurz→lang), Bögen nach Grad (klein→groß), sonst Nennweite/Name
+function kanalCompare(a,b){
+  const ta=rohrTyp(a), tb=rohrTyp(b);
+  const oa=rohrOrderIndex(ta), ob=rohrOrderIndex(tb);
+  if(oa!==ob) return oa-ob;
+  if(ta==="rohr"){ const d=parseLen(a)-parseLen(b); if(d) return d; }
+  else if(ta==="bogen"){ const d=parseGrad(a)-parseGrad(b); if(d) return d; }
+  return artikelSpec(a).localeCompare(artikelSpec(b),"de",{numeric:true}) || a.name.localeCompare(b.name,"de");
+}
+
+/* ---------------- Routing / Render ---------------- */
+let view = "vergleich";
+const VIEWS = [
+  ["vergleich","Vergleich"],
+  ["artikel","Artikel"],
+  ["lieferanten","Lieferanten"],
+  ["einheiten","Einheiten"],
+];
+function renderNav(){
+  document.getElementById("nav").innerHTML = VIEWS.map(([k,l])=>
+    `<button data-v="${k}" class="${view===k?'active':''}">${l}</button>`).join("");
+  document.querySelectorAll("#nav button").forEach(b=>
+    b.onclick=()=>{view=b.dataset.v; render();});
+}
+function render(){
+  renderNav();
+  const el=document.getElementById("app");
+  if(view==="vergleich") el.innerHTML=viewVergleich();
+  else if(view==="artikel") el.innerHTML=viewArtikel();
+  else if(view==="lieferanten") el.innerHTML=viewLieferanten();
+  else if(view==="einheiten") el.innerHTML=viewEinheiten();
+  wire();
+}
+/* ---------------- Theme ---------------- */
+function applyTheme(){
+  const t=localStorage.getItem("lv_theme")||"auto";
+  const dark = t==="dark" || (t==="auto" && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.classList.toggle("dark",dark);
+  const sel=document.getElementById("themeSel"); if(sel) sel.value=t;
+}
+
+/* ---------------- Ansicht: Vergleich ---------------- */
+let vState={q:"",kat:"",subkat:"",nur2:true,nurAlt:false,layout:"auto",selected:new Set()};
+function effLayout(){
+  if(vState.layout==="table") return "table";
+  if(vState.layout==="cards") return "cards";
+  return window.innerWidth<760 ? "cards" : "table";
+}
+function vergleichRows(){
+  let rows=state.artikel.slice();
+  if(vState.kat) rows=rows.filter(a=>artKat(a)===vState.kat);
+  if(vState.kat && vState.subkat) rows=rows.filter(a=>unterKat(a)===vState.subkat);
+  if(vState.q){
+    const q=vState.q.toLowerCase();
+    rows=rows.filter(a=>{
+      const nums=angeboteFor(a.id).map(g=>g.artikelnummer).join(" ");
+      return (artikelLabel(a)+" "+nums).toLowerCase().includes(q);
+    });
+  }
+  if(vState.nur2) rows=rows.filter(a=>new Set(angeboteFor(a.id).map(g=>g.lieferantId)).size>=2);
+  if(vState.nurAlt) rows=rows.filter(rowHasStale);
+  if(vState.kat==="Kanalrohre & Formstücke") rows.sort(kanalCompare);
+  else rows.sort((a,b)=> a.name.localeCompare(b.name,"de") ||
+      artikelSpec(a).localeCompare(artikelSpec(b),"de",{numeric:true}));
+  return rows;
+}
+function rowVals(a){
+  const vals=[];
+  for(const l of state.lieferanten){
+    const ang=angeboteFor(a.id).find(g=>g.lieferantId===l.id);
+    if(ang){ const p=aktPreis(ang.id);
+      vals.push({l,ang,aid:a.id,p:p?p.preis:null,datum:p?p.datum:null,old:p?tooOldForBest(p.datum):false}); }
+    else vals.push({l,ang:null,aid:a.id,p:null,old:false});
+  }
+  const all=vals.filter(v=>v.p!=null);
+  const current=all.filter(v=>!v.old);
+  const hasCurrent=current.length>0;
+  const pool=hasCurrent?current:all;                       // >1 Jahr alte beim Bestpreis ignorieren, wenn aktuelle da sind
+  const min=pool.length?Math.min(...pool.map(v=>v.p)):null;
+  const max=all.length?Math.max(...all.map(v=>v.p)):null;
+  return {vals,min,max,cnt:all.length,hasCurrent};
+}
+// Ist dieser Eintrag der „beste" (günstigste gültige) Preis der Zeile?
+function isBestVal(v,r){
+  return v.p!=null && v.p===r.min && (r.hasCurrent ? !v.old : true);
+}
+function priceSpan(v,r){
+  if(v.p==null) return `<span class="addhere" data-addhere="${v.aid}:${v.l.id}" title="Preis für ${esc(v.l.name)} erfassen">+ Preis</span>`;
+  let cls="price";
+  if(r.cnt>=2 && isBestVal(v,r)) cls+=" cheap";
+  else if(r.cnt>=2 && v.p===r.max) cls+=" exp";
+  const stale=isStale(v.datum);
+  if(stale) cls+=" stale";
+  const warn=stale?` <span class="warn" title="Preis veraltet – Stand ${fmtDate(v.datum)} (älter als ${staleMonths()} Monate)">⚠</span>`:"";
+  return `<span class="${cls}" data-ang="${v.ang.id}" title="Stand ${fmtDate(v.datum)} – Klicken für Historie">${fmtEUR(v.p)}</span>${warn}`;
+}
+function rowHasStale(a){
+  return rowVals(a).vals.some(v=>v.p!=null && isStale(v.datum));
+}
+// Rohrsystem innerhalb der Kanalrohre: KG 2000 vs. PVC-KG (HT wird zu PVC-KG gezählt)
+function systemFor(a){
+  const n=(a.name||"").toLowerCase();
+  return (n.includes("kg2000")||n.includes("kg 2000")||n.includes("2000")) ? "KG 2000" : "PVC-KG";
+}
+const SYS_ORDER=["PVC-KG","KG 2000"];
+// Gruppiert Zeilen nach Unterkategorie (immer)
+function groupByUnter(rows){
+  const map=new Map();
+  for(const a of rows){ const s=unterKat(a); if(!map.has(s)) map.set(s,[]); map.get(s).push(a); }
+  return [...map.entries()].sort((x,y)=>subSort(x[0],y[0])).map(([sub,rs])=>({sub,rows:rs}));
+}
+function selBox(a){ return `<input type="checkbox" class="selbox" data-artid="${a.id}"${vState.selected.has(a.id)?' checked':''} title="auswählen">`; }
+function vCardHTML(a){
+  const r=rowVals(a);
+  const lines=r.vals.map(v=>{
+    if(v.p==null){
+      return `<div class="vrow miss"><span class="vlief">${esc(v.l.name)}</span>`+
+             `<span class="addhere" data-addhere="${v.aid}:${v.l.id}" title="Preis für ${esc(v.l.name)} erfassen">+ Preis hinterlegen</span></div>`;
+    }
+    const isMin = r.cnt>=2 && isBestVal(v,r);
+    const badge = isMin ? ' <span class="cheap-pill">✓ günstigster</span>' : '';
+    let delta='';
+    if(r.min!=null && v.p>r.min){
+      const pct=r.min?Math.round((v.p-r.min)/r.min*100):0;
+      delta=`<span class="vdelta" title="Aufpreis gegenüber dem günstigsten Anbieter">+${fmtEUR(v.p-r.min)}${pct?` (+${pct} %)`:''}</span>`;
+    } else if(r.hasCurrent && v.old && v.p<r.min){
+      delta=`<span class="vdelta" style="color:var(--warn-ink)" title="günstiger, aber älter als 1 Jahr – zählt nicht als bester Preis">veraltet</span>`;
+    }
+    return `<div class="vrow${isMin?' best':''}">`+
+           `<span class="vlief">${esc(v.l.name)}${badge}</span>`+
+           `<span class="vprice"><span class="vprice-main">${priceSpan(v,r)}${delta}</span>`+
+           `<span class="pdate${isStale(v.datum)?' old':''}">Stand ${fmtDate(v.datum)}</span></span></div>`;
+  }).join("");
+  const best=(r.min!=null)? r.vals.filter(v=>isBestVal(v,r)).map(v=>v.l.name).join(", ") : "—";
+  const foot=(r.cnt>=2)
+    ? `<span>💰 günstigster: <strong>${esc(best)}</strong> – ${fmtEUR(r.min)}</span>`+
+      `<span class="pill" style="background:var(--green);color:var(--green-ink)">Ersparnis bis −${fmtEUR(r.max-r.min)}</span>`
+    : `<span>günstigster: <strong>${esc(best)}</strong></span>`;
+  return `<div class="vcard${vState.selected.has(a.id)?' selrow':''}">
+    <div class="vcard-h">${selBox(a)}<span class="artlink" data-artid="${a.id}" title="Kategorie zuordnen">${esc(a.name)}</span>${artikelSpec(a)?`<br><span class="muted">${esc(artikelSpec(a))}</span>`:""} <span class="tag">${esc(artKat(a))}</span></div>
+    <div style="margin-top:8px">${lines}</div>
+    <div class="vcard-f">${foot}</div>
+  </div>`;
+}
+function vRowHTML(a){
+  const r=rowVals(a);
+  const cells=r.vals.map(v=>`<td class="num">${priceSpan(v,r)}`+
+    (v.p!=null?`<div class="pdate${isStale(v.datum)?' old':''}">${fmtDate(v.datum)}</div>`:"")+`</td>`).join("");
+  const best=(r.min!=null)? r.vals.filter(v=>isBestVal(v,r)).map(v=>v.l.name).join(", ") : "—";
+  const sav=(r.cnt>=2)? `<span class="pill" style="background:var(--green);color:var(--green-ink)">−${fmtEUR(r.max-r.min)}</span>` : "—";
+  return `<tr${vState.selected.has(a.id)?' class="selrow"':''}>
+    <td class="selcol">${selBox(a)}</td>
+    <td><strong><span class="artlink" data-artid="${a.id}" title="Kategorie zuordnen">${esc(a.name)}</span></strong>${artikelSpec(a)?`<br><span class="muted">${esc(artikelSpec(a))}</span>`:""}</td>
+    ${cells}<td class="num">${esc(best)}</td><td class="num">${sav}</td></tr>`;
+}
+// Rendert eine Liste als Karten oder Tabelle.
+// doGroup=true: nach Unterkategorie in aufklappbaren Gruppen (standardmäßig zugeklappt)
+// bare=true: Tabelle ohne äußeren Panel-Rahmen (innerhalb eines aufklappbaren Bereichs)
+function renderBlock(rows, doGroup, bare){
+  const liefs=state.lieferanten;
+  const head=`<tr><th class="selcol"></th><th>Artikel</th>${liefs.map(l=>`<th class="num">${esc(l.name)}</th>`).join("")}
+      <th class="num">Günstigster</th><th class="num">Ersparnis</th></tr>`;
+  const itemsHTML=rs=> effLayout()==="cards"
+    ? `<div class="cards">${rs.map(vCardHTML).join("")}</div>`
+    : `<div class="${bare?'scroll tall':'panel scroll tall'}"><table><thead>${head}</thead><tbody>${rs.map(vRowHTML).join("")}</tbody></table></div>`;
+  if(!doGroup) return itemsHTML(rows);
+  return groupByUnter(rows).map(g=>
+    `<details class="subgroup" data-gk="${esc(g.sub)}"><summary>`+
+    `<input type="checkbox" class="selall" title="alle in dieser Gruppe auswählen">`+
+    `${esc(g.sub)} <span class="cnt">(${g.rows.length})</span></summary>`+
+    itemsHTML(g.rows)+`</details>`).join("");
+}
+function renderVergleichResults(){
+  const rows=vergleichRows();
+  if(!rows.length) return `<div class="panel empty">Keine Treffer.</div>`;
+
+  // Kanalrohre: zusätzlich nach Rohrsystem (PVC-KG / KG 2000) in aufklappbaren Bereichen
+  if(vState.kat==="Kanalrohre & Formstücke"){
+    const map=new Map();
+    for(const a of rows){ const s=systemFor(a); if(!map.has(s)) map.set(s,[]); map.get(s).push(a); }
+    const sys=[...map.entries()].sort((x,y)=>{
+      const ix=SYS_ORDER.indexOf(x[0]), iy=SYS_ORDER.indexOf(y[0]);
+      return (ix<0?9:ix)-(iy<0?9:iy);
+    });
+    return sys.map(([name,rs])=>
+      `<details class="sysgroup" data-gk="${esc(name)}"><summary>${esc(name)} <span class="cnt">(${rs.length} Artikel)</span></summary>`+
+      `<div class="sysbody">${renderBlock(rs,true,true)}</div></details>`).join("");
+  }
+
+  return renderBlock(rows, !!vState.kat, false);
+}
+function viewVergleich(){
+  const kats=[...new Set(state.artikel.map(artKat))].sort((a,b)=>a.localeCompare(b,"de"));
+  const katOpts=`<option value="">Alle Kategorien</option>`+
+    kats.map(k=>`<option ${vState.kat===k?'selected':''}>${esc(k)}</option>`).join("");
+  const rows=vergleichRows();
+  const comparable=rows.filter(a=>rowVals(a).cnt>=2).length;
+  const veraltet=rows.filter(rowHasStale).length;
+  const seg=[["auto","Auto"],["table","📋 Tabelle"],["cards","🗂 Karten"]].map(([k,l])=>
+    `<button data-lay="${k}" class="${vState.layout===k?'on':''}">${l}</button>`).join("");
+  // Unterkategorie-Auswahl – nur wenn eine Kategorie gewählt ist
+  let subSelect="";
+  if(vState.kat){
+    const subs=[...new Set(state.artikel.filter(a=>artKat(a)===vState.kat).map(unterKat))].sort(subSort);
+    subSelect=`<select id="vsub"><option value="">Alle Unterkategorien</option>`+
+      subs.map(s=>`<option ${vState.subkat===s?'selected':''}>${esc(s)}</option>`).join("")+`</select>`;
+  }
+  return `
+  <div class="stat">
+    <div class="card"><div class="n">${state.artikel.length}</div><div class="l">Artikel gesamt</div></div>
+    <div class="card"><div class="n">${state.lieferanten.length}</div><div class="l">Lieferanten</div></div>
+    <div class="card"><div class="n">${rows.length}</div><div class="l">Angezeigt</div></div>
+    <div class="card"><div class="n" style="${veraltet?'color:var(--warn-ink)':''}">${veraltet}</div><div class="l">⚠ veraltet (&gt;${staleMonths()} Mon.)</div></div>
+  </div>
+  <div class="toolbar">
+    <input type="text" id="vq" placeholder="🔍 Suche Artikel / Artikelnummer…" value="${esc(vState.q)}" style="min-width:240px">
+    <select id="vkat">${katOpts}</select>
+    ${subSelect}
+    ${vState.kat==="Kanalrohre & Formstücke"?`<button class="btn ghost sm" id="vorder" title="Reihenfolge der Bauteile anpassen">⇅ Reihenfolge</button>`:""}
+    <label style="display:flex;align-items:center;gap:6px;font-weight:600;color:var(--muted)">
+      <input type="checkbox" id="vnur2" ${vState.nur2?'checked':''}> nur ≥ 2 Lieferanten</label>
+    <label style="display:flex;align-items:center;gap:6px;font-weight:600;color:var(--muted)">
+      <input type="checkbox" id="vnuralt" ${vState.nurAlt?'checked':''}> nur veraltete Preise</label>
+    <div class="spacer" style="flex:1"></div>
+    <span class="seg" id="vseg" title="Darstellung umschalten">${seg}</span>
+  </div>
+  <div id="vresults">${renderVergleichResults()}</div>
+  <div class="selbar" id="selbar">
+    <span class="selinfo"><strong id="selcount">0</strong> ausgewählt</span>
+    <button class="btn sm" id="selmove">→ Verschieben</button>
+    <button class="btn danger sm" id="seldelete">🗑 Mehrere löschen</button>
+    <button class="btn ghost sm" id="selclear">Auswahl aufheben</button>
+  </div>`;
+}
+
+/* ---------------- Ansicht: Artikel ---------------- */
+let aState={q:"",kat:"",subkat:"",layout:"liste"};
+function artikelCheapest(a){
+  const ps=[];
+  for(const g of angeboteFor(a.id)){ const p=aktPreis(g.id); if(p) ps.push({preis:p.preis,old:tooOldForBest(p.datum)}); }
+  if(!ps.length) return null;
+  const cur=ps.filter(p=>!p.old);                 // >1 Jahr alte ignorieren, wenn aktuelle vorhanden
+  const pool=cur.length?cur:ps;
+  return Math.min(...pool.map(p=>p.preis));
+}
+function offeringsHTML(a){
+  return angeboteFor(a.id).map(g=>{
+    const p=aktPreis(g.id);
+    return `<div class="off">
+      <div><strong>${esc(lieferant(g.lieferantId)?.name||'?')}</strong>
+        ${g.artikelnummer?` <span class="tag">Nr. ${esc(g.artikelnummer)}</span>`:''}
+        <span class="muted">/ ${esc(g.einheit)}</span></div>
+      <div class="off-r">
+        ${p
+          ? `<span class="nowrap"><strong>${fmtEUR(p.preis)}</strong>
+              <span class="muted">· ${fmtDate(p.datum)}</span>${isStale(p.datum)?` <span class="warn" title="Preis veraltet (älter als ${staleMonths()} Monate)">⚠</span>`:''}</span>`
+          : `<button class="btn ghost sm addprice" data-newprice="${g.id}" title="Preis mit Datum hinterlegen">+ Preis hinterlegen</button>`}
+        <span class="btnrow">
+          ${p?`<button class="btn sm" data-newprice="${g.id}">+ Preis</button>`:''}
+          <button class="btn ghost sm" data-hist="${g.id}">Historie</button>
+          <button class="btn ghost sm" data-editang="${g.id}">✎</button>
+          <button class="btn danger sm" data-delang="${g.id}">🗑</button>
+        </span>
+      </div></div>`;
+  }).join("") || `<div class="muted" style="padding:7px 0">Noch kein Lieferant zugeordnet.</div>`;
+}
+function artActionsHTML(a){
+  return `<div class="btnrow">
+    <button class="btn ghost sm" data-editart="${a.id}">Bearbeiten</button>
+    <button class="btn ghost sm" data-addoff="${a.id}">+ Lieferant</button>
+    <button class="btn danger sm" data-delart="${a.id}">Löschen</button>
+  </div>`;
+}
+function aCardHTML(a){
+  return `<div class="acard">
+    <div class="acard-head">
+      <div><strong>${esc(a.name)}</strong>
+        ${artikelSpec(a)?`<br><span class="muted">${esc(artikelSpec(a))}</span>`:""}
+        <br><span class="tag">${esc(artKat(a))}</span>
+        ${a.gewicht!==""&&a.gewicht!=null?` <span class="tag">${esc(String(a.gewicht))} kg</span>`:""}</div>
+      ${artActionsHTML(a)}
+    </div>
+    <div>${offeringsHTML(a)}</div>
+  </div>`;
+}
+function aListHTML(a){
+  const cnt=angeboteFor(a.id).length;
+  const cheap=artikelCheapest(a);
+  return `<details class="litem" data-aid="${a.id}">
+    <summary>
+      <span class="l-main"><strong>${esc(a.name)}</strong>
+        ${artikelSpec(a)?`<span class="muted">${esc(artikelSpec(a))}</span>`:""}
+        <span class="tag">${esc(artKat(a))}</span></span>
+      <span class="l-meta">
+        <span>${cnt} ${cnt===1?'Lieferant':'Lieferanten'}</span>
+        <strong>${cheap!=null?'ab '+fmtEUR(cheap):'—'}</strong>
+      </span>
+    </summary>
+    <div class="l-body">
+      <div style="margin-bottom:8px">${artActionsHTML(a)}</div>
+      ${offeringsHTML(a)}
+    </div>
+  </details>`;
+}
+// Artikel als Liste oder Karten (ohne Gruppierung)
+function renderArtikelBlock(rows){
+  return aState.layout==="karten"
+    ? `<div class="acards">${rows.map(aCardHTML).join("")}</div>`
+    : `<div class="list">${rows.map(aListHTML).join("")}</div>`;
+}
+// Artikel nach Unterkategorie in aufklappbaren Gruppen (standardmäßig zugeklappt)
+function renderArtikelGrouped(rows){
+  return groupByUnter(rows).map(g=>
+    `<details class="subgroup"><summary>${esc(g.sub)} <span class="cnt">(${g.rows.length})</span></summary>`+
+    renderArtikelBlock(g.rows)+`</details>`).join("");
+}
+function viewArtikel(){
+  const kats=[...new Set(state.artikel.map(artKat))].sort((a,b)=>a.localeCompare(b,"de"));
+  const katOpts=`<option value="">Alle Kategorien</option>`+
+    kats.map(k=>`<option ${aState.kat===k?'selected':''}>${esc(k)}</option>`).join("");
+  let rows=state.artikel.slice();
+  if(aState.kat) rows=rows.filter(a=>artKat(a)===aState.kat);
+  if(aState.kat && aState.subkat) rows=rows.filter(a=>unterKat(a)===aState.subkat);
+  if(aState.q){const q=aState.q.toLowerCase();
+    rows=rows.filter(a=>(artikelLabel(a)+" "+angeboteFor(a.id).map(g=>g.artikelnummer).join(" ")).toLowerCase().includes(q));}
+  if(aState.kat==="Kanalrohre & Formstücke") rows.sort(kanalCompare);
+  else rows.sort((a,b)=>a.name.localeCompare(b.name,"de")||artikelSpec(a).localeCompare(artikelSpec(b),"de",{numeric:true}));
+  const seg=[["liste","☰ Liste"],["karten","🗂 Karten"]].map(([k,l])=>
+    `<button data-lay="${k}" class="${aState.layout===k?'on':''}">${l}</button>`).join("");
+  // Unterkategorie-Auswahl – nur wenn eine Kategorie gewählt ist
+  let subSelect="";
+  if(aState.kat){
+    const subs=[...new Set(state.artikel.filter(a=>artKat(a)===aState.kat).map(unterKat))].sort(subSort);
+    subSelect=`<select id="asub"><option value="">Alle Unterkategorien</option>`+
+      subs.map(s=>`<option ${aState.subkat===s?'selected':''}>${esc(s)}</option>`).join("")+`</select>`;
+  }
+  let content;
+  if(!rows.length){
+    content=`<div class="panel empty">Keine Treffer.</div>`;
+  } else if(aState.kat==="Kanalrohre & Formstücke"){
+    // wie im Vergleich: nach Rohrsystem (PVC-KG / KG 2000) in aufklappbaren Bereichen
+    const map=new Map();
+    for(const a of rows){ const s=systemFor(a); if(!map.has(s)) map.set(s,[]); map.get(s).push(a); }
+    const sys=[...map.entries()].sort((x,y)=>{
+      const ix=SYS_ORDER.indexOf(x[0]), iy=SYS_ORDER.indexOf(y[0]);
+      return (ix<0?9:ix)-(iy<0?9:iy);
+    });
+    content=sys.map(([name,rs])=>
+      `<details class="sysgroup"><summary>${esc(name)} <span class="cnt">(${rs.length} Artikel)</span></summary>`+
+      `<div class="sysbody">${renderArtikelGrouped(rs)}</div></details>`).join("");
+  } else if(aState.kat){
+    content=renderArtikelGrouped(rows);
+  } else {
+    content=renderArtikelBlock(rows);
+  }
+  return `
+  <div class="toolbar">
+    <button class="btn" id="addArt">+ Neuer Artikel</button>
+    <input type="text" id="aq" placeholder="🔍 Suche…" value="${esc(aState.q)}" style="min-width:180px">
+    <select id="akat">${katOpts}</select>
+    ${subSelect}
+    ${aState.kat==="Kanalrohre & Formstücke"?`<button class="btn ghost sm" id="aorder" title="Reihenfolge der Bauteile anpassen">⇅ Reihenfolge</button>`:""}
+    <span class="tag">${rows.length} Artikel</span>
+    <div class="spacer" style="flex:1"></div>
+    <span class="seg" id="aseg" title="Darstellung umschalten">${seg}</span>
+  </div>
+  ${content}`;
+}
+
+/* ---------------- Ansicht: Lieferanten ---------------- */
+let lState={layout:"liste"};
+function liefActionsHTML(l){
+  return `<span class="btnrow">
+    <button class="btn ghost sm" data-pdf="${l.id}">📄 Preisanfrage</button>
+    <button class="btn ghost sm" data-editlief="${l.id}">Bearbeiten</button>
+    <button class="btn danger sm" data-dellief="${l.id}">Löschen</button>
+  </span>`;
+}
+function lCardHTML(l){
+  const angs=angebotePerLieferant(l.id);
+  const mitPreis=angs.filter(g=>aktPreis(g.id)).length;
+  return `<div class="acard">
+    <div class="acard-head">
+      <div><strong>${esc(l.name)}</strong>${l.notiz?`<br><span class="muted">${esc(l.notiz)}</span>`:""}</div>
+      ${liefActionsHTML(l)}
+    </div>
+    <div class="off"><span class="vlief">Artikel</span><strong>${angs.length}</strong></div>
+    <div class="off"><span class="vlief">davon mit Preis</span><strong>${mitPreis}</strong></div>
+  </div>`;
+}
+function lListHTML(l){
+  const angs=angebotePerLieferant(l.id);
+  const mitPreis=angs.filter(g=>aktPreis(g.id)).length;
+  return `<div class="litem"><div class="lrow">
+    <span class="l-main"><strong>${esc(l.name)}</strong>${l.notiz?` <span class="muted">${esc(l.notiz)}</span>`:""}</span>
+    <span class="l-meta">
+      <span>${angs.length} Artikel</span>
+      <span>${mitPreis} mit Preis</span>
+      ${liefActionsHTML(l)}
+    </span>
+  </div></div>`;
+}
+// PDF-/Druck-Export einer Preisanfrage je Lieferant (Artikel + Artikelnummer, ohne Preise)
+function printPreisanfrage(lieferantId){
+  const l=lieferant(lieferantId); if(!l) return;
+  const items=angebotePerLieferant(lieferantId)
+    .map(g=>({art:artikel(g.artikelId),nr:g.artikelnummer||"",einheit:g.einheit||""}))
+    .filter(x=>x.art);
+  if(!items.length){ alert("Für diesen Lieferanten sind keine Artikel hinterlegt."); return; }
+  items.sort((a,b)=>
+    artKat(a.art).localeCompare(artKat(b.art),"de") ||
+    a.art.name.localeCompare(b.art.name,"de") ||
+    artikelSpec(a.art).localeCompare(artikelSpec(b.art),"de",{numeric:true}));
+  let rows="", lastKat=null;
+  for(const it of items){
+    const k=artKat(it.art);
+    if(k!==lastKat){ rows+=`<tr class="pa-cat"><td colspan="4">${esc(k)}</td></tr>`; lastKat=k; }
+    const bez=esc(it.art.name)+(artikelSpec(it.art)?` – ${esc(artikelSpec(it.art))}`:"");
+    rows+=`<tr><td class="pa-num">${esc(it.nr)||"—"}</td><td>${bez}</td><td>${esc(it.einheit)}</td><td></td></tr>`;
+  }
+  document.getElementById("printArea").innerHTML=`
+    <div class="pa-doc">
+      <div class="pa-head">
+        <div><h1>Preisanfrage</h1><div>Bitte um Aktualisierung der Preise</div></div>
+        <div style="text-align:right">
+          <div>Lieferant: <strong>${esc(l.name)}</strong></div>
+          <div>Datum: ${fmtDate(todayISO())}</div>
+          <div>${items.length} Artikel</div>
+        </div>
+      </div>
+      <p class="pa-intro">Sehr geehrte Damen und Herren,<br>
+        bitte tragen Sie für die folgenden Artikel Ihren aktuellen Preis in die rechte Spalte ein
+        und senden uns die Liste zurück. Vielen Dank.</p>
+      <table>
+        <thead><tr><th style="width:26%">Artikelnummer</th><th>Bezeichnung</th><th style="width:12%">Einheit</th><th style="width:20%">Neuer Preis (€)</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="pa-foot">Erstellt am ${fmtDate(todayISO())} · ${esc(l.name)} · ${items.length} Artikel</div>
+    </div>`;
+  window.print();
+}
+function viewLieferanten(){
+  const seg=[["liste","☰ Liste"],["karten","🗂 Karten"]].map(([k,l])=>
+    `<button data-lay="${k}" class="${lState.layout===k?'on':''}">${l}</button>`).join("");
+  let content;
+  if(!state.lieferanten.length) content=`<div class="panel empty">Noch keine Lieferanten.</div>`;
+  else if(lState.layout==="karten") content=`<div class="acards">${state.lieferanten.map(lCardHTML).join("")}</div>`;
+  else content=`<div class="list">${state.lieferanten.map(lListHTML).join("")}</div>`;
+  return `
+  <div class="toolbar"><button class="btn" id="addLief">+ Neuer Lieferant</button>
+    <span class="tag">${state.lieferanten.length} Lieferanten</span>
+    <div class="spacer" style="flex:1"></div>
+    <span class="seg" id="lseg" title="Darstellung umschalten">${seg}</span>
+  </div>
+  ${content}`;
+}
+
+/* ---------------- Ansicht: Einheiten / Einstellungen ---------------- */
+function viewEinheiten(){
+  return `
+  <div class="panel" style="padding:18px;max-width:640px;margin-bottom:16px">
+    <h3 style="margin-top:0">Einheiten verwalten</h3>
+    <p class="muted">Diese Einheiten stehen bei jedem Lieferanten-Angebot zur Auswahl.</p>
+    <div class="chiprow" id="unitChips">
+      ${state.einheiten.map(u=>`<span class="chip">${esc(u)}<button data-delunit="${esc(u)}">×</button></span>`).join("")}
+    </div>
+    <div class="toolbar" style="margin-top:16px">
+      <input type="text" id="newUnit" placeholder="z. B. Bund, Rolle, m³ …">
+      <button class="btn" id="addUnit">Hinzufügen</button>
+    </div>
+  </div>
+  <div class="panel" style="padding:18px;max-width:640px">
+    <h3 style="margin-top:0">Einstellungen</h3>
+    <label class="field" style="max-width:320px">Preis gilt als veraltet nach (Monaten)
+      <input type="number" min="1" max="60" id="staleMonths" value="${staleMonths()}">
+    </label>
+    <p class="muted" style="margin-bottom:0">Preise, deren „Stand" älter als dieser Zeitraum ist, werden im
+      Vergleich mit ⚠ markiert. Über den Filter „nur veraltete Preise" siehst du, was aktualisiert werden sollte.</p>
+  </div>
+  <div class="panel" style="padding:18px;max-width:640px;margin-top:16px">
+    <h3 style="margin-top:0">Version & Updates</h3>
+    <p class="muted" style="margin-top:0">Installierte Version: <strong>${esc(currentVersion())}</strong></p>
+    <div class="toolbar" style="margin:0">
+      <button class="btn ghost" id="btnCheckUpdate">Nach Update suchen</button>
+      <span class="muted" id="updStatus"></span>
+    </div>
+  </div>
+  <div class="panel" style="padding:18px;max-width:640px;margin-top:16px">
+    <h3 style="margin-top:0">Kategorien-Übersicht</h3>
+    <p class="muted">${KATEGORIEN.filter(k=>state.artikel.some(a=>artKat(a)===k)).length} Kategorien mit Artikeln. Ein Klick auf einen Artikelnamen im Vergleich ordnet ihn neu zu.</p>
+    <div class="list">
+      ${KATEGORIEN.filter(k=>state.artikel.some(a=>artKat(a)===k)).map(k=>{
+        const anz=state.artikel.filter(a=>artKat(a)===k).length;
+        const subs=subcatsOf(k);
+        return `<div class="litem"><div class="lrow" style="align-items:flex-start">
+          <span class="l-main"><strong>${esc(k)}</strong>
+            <br><span class="muted" style="font-size:12px">${subs.map(esc).join(" · ")}</span></span>
+          <span class="l-meta"><span>${anz} Artikel</span><span class="tag">${subs.length} Unterkat.</span></span>
+        </div></div>`;
+      }).join("")}
+    </div>
+  </div>`;
+}
+
+/* ---------------- Verdrahtung ---------------- */
+function wire(){
+  // Vergleich
+  const vq=document.getElementById("vq");
+  if(vq){
+    vq.oninput=e=>{vState.q=e.target.value; refreshVergleich();};
+    document.getElementById("vkat").onchange=e=>{vState.kat=e.target.value; vState.subkat=""; render();};
+    {const vs=document.getElementById("vsub"); if(vs) vs.onchange=e=>{vState.subkat=e.target.value; render();};}
+    {const o=document.getElementById("vorder"); if(o) o.onclick=openReihenfolge;}
+    document.getElementById("vnur2").onchange=e=>{vState.nur2=e.target.checked; render();};
+    document.getElementById("vnuralt").onchange=e=>{vState.nurAlt=e.target.checked; render();};
+    document.querySelectorAll("#vseg button").forEach(b=>b.onclick=()=>{vState.layout=b.dataset.lay; render();});
+    rebindPrices();
+    {const b=document.getElementById("selmove"); if(b) b.onclick=()=>openVerschieben([...vState.selected]);}
+    {const b=document.getElementById("seldelete"); if(b) b.onclick=()=>deleteSelected([...vState.selected]);}
+    {const b=document.getElementById("selclear"); if(b) b.onclick=clearSel;}
+    updateSelbar();
+  }
+  // Artikel
+  if(document.getElementById("addArt")){
+    document.getElementById("addArt").onclick=()=>editArtikel(null);
+    document.getElementById("aq").oninput=e=>{aState.q=e.target.value; render();
+      const i=document.getElementById("aq"); i.focus(); i.setSelectionRange(i.value.length,i.value.length);};
+    document.getElementById("akat").onchange=e=>{aState.kat=e.target.value; aState.subkat=""; render();};
+    {const as=document.getElementById("asub"); if(as) as.onchange=e=>{aState.subkat=e.target.value; render();};}
+    {const o=document.getElementById("aorder"); if(o) o.onclick=openReihenfolge;}
+    document.querySelectorAll("#aseg button").forEach(b=>b.onclick=()=>{aState.layout=b.dataset.lay; render();});
+    bind("[data-editart]","click",el=>editArtikel(el.dataset.editart));
+    bind("[data-delart]","click",el=>delArtikel(el.dataset.delart));
+    bind("[data-addoff]","click",el=>editAngebot(null,el.dataset.addoff));
+    bind("[data-editang]","click",el=>editAngebot(el.dataset.editang));
+    bind("[data-delang]","click",el=>delAngebot(el.dataset.delang));
+    bind("[data-newprice]","click",el=>addPreis(el.dataset.newprice));
+    bind("[data-hist]","click",el=>showHistorie(el.dataset.hist));
+  }
+  // Lieferanten
+  if(document.getElementById("addLief")){
+    document.getElementById("addLief").onclick=()=>editLieferant(null);
+    document.querySelectorAll("#lseg button").forEach(b=>b.onclick=()=>{lState.layout=b.dataset.lay; render();});
+    bind("[data-editlief]","click",el=>editLieferant(el.dataset.editlief));
+    bind("[data-dellief]","click",el=>delLieferant(el.dataset.dellief));
+    bind("[data-pdf]","click",el=>printPreisanfrage(el.dataset.pdf));
+  }
+  // Einheiten
+  if(document.getElementById("addUnit")){
+    document.getElementById("addUnit").onclick=addUnit;
+    document.getElementById("newUnit").onkeydown=e=>{if(e.key==="Enter")addUnit();};
+    bind("[data-delunit]","click",el=>delUnit(el.dataset.delunit));
+    const sm=document.getElementById("staleMonths");
+    sm.onchange=e=>{let v=parseInt(e.target.value,10); if(isNaN(v)||v<1)v=6; if(v>60)v=60;
+      state.settings.staleMonths=v; saveDB(); render();};
+    const cu=document.getElementById("btnCheckUpdate"); if(cu) cu.onclick=()=>checkForUpdate(true);
+  }
+}
+function bind(sel,ev,fn){ document.querySelectorAll(sel).forEach(el=>el.addEventListener(ev,()=>fn(el))); }
+function rebindPrices(){
+  bind(".price[data-ang]","click",el=>showHistorie(el.dataset.ang));
+  bind(".artlink[data-artid]","click",el=>openKatZuordnung(el.dataset.artid));
+  bind(".addhere[data-addhere]","click",el=>{const [aid,lid]=el.dataset.addhere.split(":"); addPreisVergleich(aid,lid);});
+  bind(".selbox","change",toggleSel);
+  document.querySelectorAll(".selall").forEach(el=>{
+    el.addEventListener("click",e=>e.stopPropagation());   // Gruppe nicht auf-/zuklappen
+    el.addEventListener("change",()=>toggleSelAll(el));
+  });
+  refreshSelAll();
+}
+function refreshVergleich(){
+  const r=document.getElementById("vresults"); if(!r) return;
+  r.innerHTML=renderVergleichResults(); rebindPrices();
+}
+// Eindeutiger Schlüssel einer aufklappbaren Gruppe (System bzw. Untergruppe inkl. System-Kontext)
+function detKey(d){
+  if(d.classList.contains("sysgroup")) return "S:"+(d.dataset.gk||"");
+  const sys=d.closest("details.sysgroup");
+  return "G:"+(sys?(sys.dataset.gk||""):"")+":"+(d.dataset.gk||"");
+}
+// Neu rendern, dabei aufgeklappte Gruppen und Scroll-Position beibehalten.
+// ensureIds: Artikel, deren Gruppe(n) zusätzlich aufgeklappt werden (damit verschobene sichtbar bleiben)
+function renderKeepView(ensureIds){
+  const open=new Set();
+  document.querySelectorAll("#vresults details.sysgroup, #vresults details.subgroup")
+    .forEach(d=>{ if(d.open) open.add(detKey(d)); });
+  const y=window.scrollY;
+  render();
+  document.querySelectorAll("#vresults details.sysgroup, #vresults details.subgroup")
+    .forEach(d=>{ if(open.has(detKey(d))) d.open=true; });
+  (ensureIds||[]).forEach(id=>{
+    const el=document.querySelector(`#vresults [data-artid="${id}"]`);
+    let d=el&&el.closest("details");
+    while(d){ d.open=true; const p=d.parentElement&&d.parentElement.closest("details"); d=p; }
+  });
+  window.scrollTo(0,y);
+}
+
+/* ---------------- Modals ---------------- */
+function modal(title, bodyHTML, footHTML){
+  document.getElementById("modalRoot").innerHTML=`
+    <div class="overlay" id="ov">
+      <div class="modal">
+        <header><strong>${esc(title)}</strong><button class="x" id="mx">×</button></header>
+        <div class="body">${bodyHTML}</div>
+        <div class="foot">${footHTML}</div>
+      </div>
+    </div>`;
+  document.getElementById("mx").onclick=closeModal;
+  document.getElementById("ov").onclick=e=>{if(e.target.id==="ov")closeModal();};
+}
+function closeModal(){ document.getElementById("modalRoot").innerHTML=""; }
+
+function editLieferant(id){
+  const l=id?lieferant(id):{name:"",notiz:""};
+  modal(id?"Lieferant bearbeiten":"Neuer Lieferant",
+    `<label class="field">Name
+       <input type="text" id="f_name" value="${esc(l.name)}" placeholder="Firmenname"></label>
+     <label class="field">Notiz (optional)
+       <textarea id="f_notiz" rows="2">${esc(l.notiz||"")}</textarea></label>`,
+    `<button class="btn ghost" onclick="closeModal()">Abbrechen</button>
+     <button class="btn" id="save">Speichern</button>`);
+  document.getElementById("save").onclick=()=>{
+    const name=val("f_name").trim(); if(!name){alert("Bitte Namen eingeben.");return;}
+    if(id){ l.name=name; l.notiz=val("f_notiz").trim(); }
+    else state.lieferanten.push({id:uid("l"),name,notiz:val("f_notiz").trim()});
+    saveDB(); closeModal(); render();
+  };
+}
+function delLieferant(id){
+  const angs=angebotePerLieferant(id);
+  if(!confirm(`Lieferant „${lieferant(id).name}" inkl. ${angs.length} Angebot(en) und Preishistorie löschen?`)) return;
+  const angIds=new Set(angs.map(a=>a.id));
+  state.preise=state.preise.filter(p=>!angIds.has(p.angebotId));
+  state.angebote=state.angebote.filter(a=>a.lieferantId!==id);
+  state.lieferanten=state.lieferanten.filter(l=>l.id!==id);
+  saveDB(); render();
+}
+
+function editArtikel(id){
+  const a=id?artikel(id):{name:"",laenge:"",nennweite:"",grad:"",gewicht:"",kategorie:"",unterkategorie:""};
+  const names=[...new Set(state.artikel.map(x=>x.name))].sort((x,y)=>x.localeCompare(y,"de"));
+  const explicit = a.kategorie && KATEGORIEN.includes(a.kategorie) ? a.kategorie : "";
+  const katOpts=`<option value="">Automatisch (aus Bezeichnung)</option>`+
+    KATEGORIEN.map(k=>`<option ${explicit===k?'selected':''}>${esc(k)}</option>`).join("");
+  modal(id?"Artikel bearbeiten":"Neuer Artikel",
+    `<label class="field">Bezeichnung
+       <input type="text" id="f_name" list="namelist" value="${esc(a.name)}" placeholder="z. B. PVC-KG-Rohre">
+       <datalist id="namelist">${names.map(k=>`<option value="${esc(k)}">`).join("")}</datalist></label>
+     <div class="grid2">
+       <label class="field">Kategorie
+         <select id="f_kat">${katOpts}</select>
+         <span class="src-note" id="katHint"></span></label>
+       <label class="field">Unterkategorie
+         <input type="text" id="f_subkat" list="sublist" value="${esc(a.unterkategorie||"")}" placeholder="leer = automatisch">
+         <datalist id="sublist"></datalist></label>
+     </div>
+     <div class="grid3">
+       <label class="field">Länge<input type="text" id="f_laenge" value="${esc(a.laenge||"")}" placeholder="z. B. 1 m"></label>
+       <label class="field">Nennweite (DN)<input type="text" id="f_nw" value="${esc(a.nennweite||"")}" placeholder="z. B. NW 100"></label>
+       <label class="field">Grad<input type="text" id="f_grad" value="${esc(a.grad||"")}" placeholder="z. B. 45 Grad"></label>
+     </div>
+     <label class="field">Gewicht (kg, optional)
+       <input type="number" step="0.01" id="f_gew" value="${a.gewicht!==""&&a.gewicht!=null?a.gewicht:""}"></label>
+     <p class="src-note">Länge, Nennweite und Grad bestimmen die Artikel-Identität für den Vergleich
+        über mehrere Lieferanten hinweg.</p>`,
+    `<button class="btn ghost" onclick="closeModal()">Abbrechen</button>
+     <button class="btn" id="save">Speichern</button>`);
+  const updateHint=()=>{
+    const hint=document.getElementById("katHint");
+    if(val("f_kat")===""){ hint.textContent="→ "+kategorieFor(val("f_name")); }
+    else hint.textContent="";
+    const k=val("f_kat")||kategorieFor(val("f_name"));
+    document.getElementById("sublist").innerHTML=subcatsOf(k).map(s=>`<option value="${esc(s)}">`).join("");
+  };
+  document.getElementById("f_name").addEventListener("input",updateHint);
+  document.getElementById("f_kat").addEventListener("change",updateHint);
+  updateHint();
+  document.getElementById("save").onclick=()=>{
+    const name=val("f_name").trim(); if(!name){alert("Bitte Bezeichnung eingeben.");return;}
+    const gewRaw=val("f_gew").trim();
+    const obj={name,laenge:val("f_laenge").trim(),nennweite:val("f_nw").trim(),
+               grad:val("f_grad").trim(),gewicht:gewRaw===""?"":parseFloat(gewRaw),
+               kategorie:val("f_kat"),unterkategorie:val("f_subkat").trim()};
+    if(id){ Object.assign(a,obj); }
+    else state.artikel.push(Object.assign({id:uid("a")},obj));
+    saveDB(); closeModal(); render();
+  };
+}
+// Aus dem Vergleich: Artikel einer (Unter-)Kategorie zuordnen (Tippen auf den Namen)
+function openKatZuordnung(id){
+  const a=artikel(id); if(!a) return;
+  const explicitKat = a.kategorie && KATEGORIEN.includes(a.kategorie) ? a.kategorie : "";
+  const katOpts=`<option value="">Automatisch (${esc(kategorieFor(a.name))})</option>`+
+    KATEGORIEN.map(k=>`<option value="${esc(k)}" ${explicitKat===k?'selected':''}>${esc(k)}</option>`).join("");
+  modal("Kategorie zuordnen",
+    `<p class="muted" style="margin:0"><strong>${esc(a.name)}</strong>${artikelSpec(a)?` · ${esc(artikelSpec(a))}`:""}</p>
+     <label class="field">Kategorie<select id="z_kat">${katOpts}</select></label>
+     <label class="field">Unterkategorie
+       <input type="text" id="z_sub" list="zsublist" value="${esc(a.unterkategorie||"")}" placeholder="leer = automatisch">
+       <datalist id="zsublist"></datalist>
+       <span class="src-note">Zurzeit: ${esc(artKat(a))} › ${esc(unterKat(a))}. Feld leer lassen = automatische Zuordnung.</span></label>`,
+    `<button class="btn ghost" onclick="closeModal()">Abbrechen</button>
+     <button class="btn" id="zsave">Speichern</button>`);
+  const fillSub=()=>{ const k=val("z_kat")||kategorieFor(a.name);
+    document.getElementById("zsublist").innerHTML=subcatsOf(k).map(s=>`<option value="${esc(s)}">`).join(""); };
+  document.getElementById("z_kat").addEventListener("change",fillSub); fillSub();
+  document.getElementById("zsave").onclick=()=>{
+    a.kategorie=val("z_kat");
+    a.unterkategorie=val("z_sub").trim();
+    saveDB(); closeModal(); renderKeepView([a.id]);
+  };
+}
+/* ---------------- Mehrfachauswahl (Vergleich) ---------------- */
+function updateSelbar(){
+  const bar=document.getElementById("selbar"); if(!bar) return;
+  const n=vState.selected.size;
+  bar.style.display=n>0?"flex":"none";
+  const c=document.getElementById("selcount"); if(c) c.textContent=n;
+  // Geräte-Vorschau ausblenden, solange eine Auswahl aktiv ist (sonst Überlappung)
+  const db=document.querySelector(".devbar"); if(db) db.style.display=n>0?"none":"";
+}
+function toggleSel(el){
+  const id=el.dataset.artid;
+  if(el.checked) vState.selected.add(id); else vState.selected.delete(id);
+  const row=el.closest("tr,.vcard"); if(row) row.classList.toggle("selrow",el.checked);
+  updateSelbar(); refreshSelAll();
+}
+// "Alle in dieser Untergruppe" – wirkt nur auf die Artikel dieser einen Gruppe
+function toggleSelAll(el){
+  const det=el.closest("details.subgroup"); if(!det) return;
+  det.querySelectorAll(".selbox").forEach(b=>{
+    b.checked=el.checked;
+    if(el.checked) vState.selected.add(b.dataset.artid); else vState.selected.delete(b.dataset.artid);
+    const row=b.closest("tr,.vcard"); if(row) row.classList.toggle("selrow",el.checked);
+  });
+  el.indeterminate=false;
+  updateSelbar();
+}
+// Setzt die Gruppen-Checkbox auf an/aus/teilweise je nach Stand der Einzel-Checkboxen
+function refreshSelAll(){
+  document.querySelectorAll(".selall").forEach(el=>{
+    const det=el.closest("details.subgroup"); if(!det) return;
+    const boxes=[...det.querySelectorAll(".selbox")];
+    const n=boxes.filter(b=>b.checked).length;
+    el.checked = boxes.length>0 && n===boxes.length;
+    el.indeterminate = n>0 && n<boxes.length;
+  });
+}
+function clearSel(){
+  vState.selected.clear();
+  document.querySelectorAll(".selbox").forEach(c=>{ c.checked=false; const r=c.closest("tr,.vcard"); if(r)r.classList.remove("selrow"); });
+  updateSelbar(); refreshSelAll();
+}
+function deleteSelected(ids){
+  if(!ids.length) return;
+  if(!confirm(`${ids.length} Artikel inkl. aller Angebote und Preise löschen?`)) return;
+  const idset=new Set(ids);
+  const angIds=new Set(state.angebote.filter(g=>idset.has(g.artikelId)).map(g=>g.id));
+  state.preise=state.preise.filter(p=>!angIds.has(p.angebotId));
+  state.angebote=state.angebote.filter(g=>!idset.has(g.artikelId));
+  state.artikel=state.artikel.filter(a=>!idset.has(a.id));
+  vState.selected.clear(); saveDB(); render();
+}
+function openVerschieben(ids){
+  if(!ids.length) return;
+  const katOpts=`<option value="">Automatisch (aus Bezeichnung)</option>`+
+    KATEGORIEN.map(k=>`<option value="${esc(k)}">${esc(k)}</option>`).join("");
+  modal(`${ids.length} Artikel verschieben`,
+    `<p class="muted" style="margin:0">Die ${ids.length} ausgewählten Artikel einer (Unter-)Kategorie zuordnen:</p>
+     <label class="field">Kategorie<select id="m_kat">${katOpts}</select></label>
+     <label class="field">Unterkategorie (optional)
+       <input type="text" id="m_sub" list="msublist" placeholder="leer = automatisch">
+       <datalist id="msublist"></datalist></label>`,
+    `<button class="btn ghost" onclick="closeModal()">Abbrechen</button>
+     <button class="btn" id="msave">Verschieben</button>`);
+  const fill=()=>{ const k=val("m_kat");
+    document.getElementById("msublist").innerHTML=(k?subcatsOf(k):[]).map(s=>`<option value="${esc(s)}">`).join(""); };
+  document.getElementById("m_kat").addEventListener("change",fill); fill();
+  document.getElementById("msave").onclick=()=>{
+    const k=val("m_kat"), sub=val("m_sub").trim();
+    ids.forEach(id=>{ const a=artikel(id); if(a){ a.kategorie=k; a.unterkategorie=sub; } });
+    vState.selected.clear(); saveDB(); closeModal(); renderKeepView(ids);
+  };
+}
+function delArtikel(id){
+  const angs=angeboteFor(id);
+  if(!confirm(`Artikel „${artikelLabel(artikel(id))}" inkl. ${angs.length} Angebot(en) und Preishistorie löschen?`))return;
+  const angIds=new Set(angs.map(a=>a.id));
+  state.preise=state.preise.filter(p=>!angIds.has(p.angebotId));
+  state.angebote=state.angebote.filter(a=>a.artikelId!==id);
+  state.artikel=state.artikel.filter(a=>a.id!==id);
+  saveDB(); render();
+}
+
+function editAngebot(id, artikelId){
+  const g=id?byId(state.angebote,id):{lieferantId:state.lieferanten[0]?.id,artikelId,artikelnummer:"",einheit:state.einheiten[0]||"Stk.",notiz:""};
+  const liefOpts=state.lieferanten.map(l=>`<option value="${l.id}" ${g.lieferantId===l.id?'selected':''}>${esc(l.name)}</option>`).join("");
+  const unitOpts=state.einheiten.map(u=>`<option ${g.einheit===u?'selected':''}>${esc(u)}</option>`).join("");
+  const art=artikel(g.artikelId);
+  modal(id?"Angebot bearbeiten":"Lieferant zu Artikel hinzufügen",
+    `<p class="muted" style="margin:0">Artikel: <strong>${esc(artikelLabel(art))}</strong></p>
+     <div class="grid2">
+       <label class="field">Lieferant<select id="f_lief">${liefOpts}</select></label>
+       <label class="field">Einheit<select id="f_unit">${unitOpts}</select></label>
+     </div>
+     <label class="field">Artikelnummer (lieferantenspezifisch)
+       <input type="text" id="f_nr" value="${esc(g.artikelnummer||"")}"></label>
+     ${!id?`<div class="grid2">
+       <label class="field">Aktueller Preis (€)<input type="number" step="0.01" id="f_preis" placeholder="z. B. 4,16"></label>
+       <label class="field">Gültig ab<input type="date" id="f_datum" value="${todayISO()}"></label></div>`:""}
+     <label class="field">Notiz (optional)<input type="text" id="f_notiz" value="${esc(g.notiz||"")}"></label>`,
+    `<button class="btn ghost" onclick="closeModal()">Abbrechen</button>
+     <button class="btn" id="save">Speichern</button>`);
+  document.getElementById("save").onclick=()=>{
+    const lief=val("f_lief"), unit=val("f_unit"), nr=val("f_nr").trim(), notiz=val("f_notiz").trim();
+    if(id){ Object.assign(g,{lieferantId:lief,einheit:unit,artikelnummer:nr,notiz}); }
+    else{
+      const ang={id:uid("ang"),lieferantId:lief,artikelId:g.artikelId,artikelnummer:nr,einheit:unit,notiz};
+      state.angebote.push(ang);
+      const pr=val("f_preis").trim();
+      if(pr!==""){ state.preise.push({id:uid("p"),angebotId:ang.id,preis:parseFloat(pr),
+        datum:val("f_datum")||todayISO(),notiz:"Ersterfassung"}); }
+    }
+    saveDB(); closeModal(); render();
+  };
+}
+function delAngebot(id){
+  const g=byId(state.angebote,id);
+  if(!confirm(`Angebot von „${lieferant(g.lieferantId).name}" inkl. Preishistorie löschen?`))return;
+  state.preise=state.preise.filter(p=>p.angebotId!==id);
+  state.angebote=state.angebote.filter(a=>a.id!==id);
+  saveDB(); render();
+}
+
+function addPreis(angebotId){
+  const g=byId(state.angebote,angebotId);
+  const akt=aktPreis(angebotId);
+  modal("Neuen Preis erfassen",
+    `<p class="muted" style="margin:0">${esc(lieferant(g.lieferantId).name)} — ${esc(artikelLabel(artikel(g.artikelId)))}</p>
+     ${akt?`<p class="src-note">Aktueller Preis: <strong>${fmtEUR(akt.preis)}</strong> (Stand ${fmtDate(akt.datum)})</p>`:""}
+     <div class="grid2">
+       <label class="field">Neuer Preis (€)<input type="number" step="0.01" id="f_preis" placeholder="0,00"></label>
+       <label class="field">Gültig ab<input type="date" id="f_datum" value="${todayISO()}"></label>
+     </div>
+     <label class="field">Notiz (optional)<input type="text" id="f_notiz" placeholder="z. B. neue Preisliste"></label>`,
+    `<button class="btn ghost" onclick="closeModal()">Abbrechen</button>
+     <button class="btn" id="save">Preis speichern</button>`);
+  const aid=g.artikelId;
+  document.getElementById("save").onclick=()=>{
+    const pr=val("f_preis").trim(); if(pr===""||isNaN(parseFloat(pr))){alert("Bitte Preis eingeben.");return;}
+    state.preise.push({id:uid("p"),angebotId,preis:parseFloat(pr),datum:val("f_datum")||todayISO(),notiz:val("f_notiz").trim()});
+    saveDB(); closeModal(); render();
+    // In der Artikel-Liste den bearbeiteten Artikel aufgeklappt lassen
+    if(view==="artikel"){
+      const det=document.querySelector(`#app details.litem[data-aid="${aid}"]`);
+      if(det){ det.open=true; det.scrollIntoView({block:"center"}); }
+    }
+  };
+}
+
+// Aus dem Vergleich: Preis für einen Lieferanten erfassen (Angebot ggf. neu anlegen)
+function addPreisVergleich(artikelId, lieferantId){
+  const art=artikel(artikelId), lief=lieferant(lieferantId);
+  if(!art||!lief) return;
+  const existing=angeboteFor(artikelId).find(g=>g.lieferantId===lieferantId);
+  const unitOpts=state.einheiten.map(u=>`<option ${existing&&existing.einheit===u?'selected':''}>${esc(u)}</option>`).join("");
+  modal("Preis erfassen",
+    `<p class="muted" style="margin:0"><strong>${esc(lief.name)}</strong> — ${esc(artikelLabel(art))}</p>
+     <div class="grid2">
+       <label class="field">Preis (€)<input type="number" step="0.01" id="f_preis" placeholder="0,00"></label>
+       <label class="field">Gültig ab<input type="date" id="f_datum" value="${todayISO()}"></label>
+     </div>
+     <div class="grid2">
+       <label class="field">Einheit<select id="f_unit">${unitOpts}</select></label>
+       <label class="field">Artikelnummer (optional)<input type="text" id="f_nr" value="${existing?esc(existing.artikelnummer||''):''}"></label>
+     </div>`,
+    `<button class="btn ghost" onclick="closeModal()">Abbrechen</button>
+     <button class="btn" id="save">Preis speichern</button>`);
+  document.getElementById("save").onclick=()=>{
+    const pr=val("f_preis").trim(); if(pr===""||isNaN(parseFloat(pr))){alert("Bitte Preis eingeben.");return;}
+    let ang=existing;
+    if(!ang){ ang={id:uid("ang"),lieferantId,artikelId,artikelnummer:val("f_nr").trim(),einheit:val("f_unit"),notiz:""}; state.angebote.push(ang); }
+    else { ang.einheit=val("f_unit"); ang.artikelnummer=val("f_nr").trim(); }
+    state.preise.push({id:uid("p"),angebotId:ang.id,preis:parseFloat(pr),datum:val("f_datum")||todayISO(),notiz:"Erfassung im Vergleich"});
+    saveDB(); closeModal(); renderKeepView([artikelId]);
+  };
+}
+function showHistorie(angebotId){
+  const g=byId(state.angebote,angebotId);
+  const h=preiseFor(angebotId);
+  const rows=h.map((p,i)=>{
+    const next=h[i+1];
+    let delta="";
+    if(next){ const d=p.preis-next.preis; const pct=next.preis?(d/next.preis*100):0;
+      delta=`<span class="${d>=0?'delta-up':'delta-dn'}">${d>=0?'▲':'▼'} ${fmtEUR(Math.abs(d))} (${pct>=0?'+':''}${pct.toFixed(1)} %)</span>`; }
+    return `<div class="hist-row">
+      <div>${i===0?'<span class="badge-new">AKTUELL</span> ':''}<strong>${fmtEUR(p.preis)}</strong>
+        <span class="muted">/ ${esc(g.einheit)}</span> &nbsp; ${delta}
+        ${p.notiz?`<br><span class="src-note">${esc(p.notiz)}</span>`:""}</div>
+      <div class="nowrap"><span class="muted">${fmtDate(p.datum)}</span>
+        <button class="btn danger sm" data-delpreis="${p.id}">🗑</button></div>
+    </div>`;
+  }).join("") || `<div class="empty">Noch keine Preise erfasst.</div>`;
+  modal(`Preishistorie – ${lieferant(g.lieferantId).name}`,
+    `<p class="muted" style="margin:0">${esc(artikelLabel(artikel(g.artikelId)))}
+       ${g.artikelnummer?`· Art.-Nr. ${esc(g.artikelnummer)}`:''}</p>
+     <div>${rows}</div>`,
+    `<button class="btn ghost" onclick="closeModal()">Schließen</button>
+     <button class="btn" id="addP">+ Neuen Preis erfassen</button>`);
+  document.getElementById("addP").onclick=()=>{closeModal();addPreis(angebotId);};
+  bind("[data-delpreis]","click",el=>{
+    if(!confirm("Diesen Preiseintrag löschen?"))return;
+    state.preise=state.preise.filter(p=>p.id!==el.dataset.delpreis);
+    saveDB(); showHistorie(angebotId);
+  });
+}
+
+/* ---------------- Reihenfolge der Kanalrohr-Bauteile ---------------- */
+function openReihenfolge(){
+  modal("Reihenfolge der Rohr-Bauteile",
+    `<p class="muted" style="margin:0 0 4px">Bestimmt, in welcher Reihenfolge die Bauteile innerhalb der
+       Kanalrohr-Gruppen aufgelistet werden. Per <strong>Ziehen</strong> oder mit <strong>▲▼</strong> verschieben.
+       <br><span class="src-note">Innerhalb eines Typs: Rohre nach Länge (kurz→lang), Bögen nach Grad (klein→groß).</span></p>
+     <div id="orderList"></div>`,
+    `<button class="btn ghost" id="orderReset">Standard wiederherstellen</button>
+     <button class="btn" onclick="closeModal()">Fertig</button>`);
+  renderOrderList();
+  document.getElementById("orderReset").onclick=()=>{ state.settings.rohrOrder=ROHR_KEYS.slice(); saveDB(); renderOrderList(); render(); };
+}
+let _dragOrderFrom=null;
+function renderOrderList(){
+  const el=document.getElementById("orderList");
+  const ord=state.settings.rohrOrder;
+  el.innerHTML=ord.map((k,i)=>`
+    <div class="ord-item" draggable="true" data-i="${i}">
+      <span class="ord-grip" title="Ziehen">⠿</span>
+      <span class="ord-label">${i+1}. ${esc(rohrLabel(k))}</span>
+      <span class="btnrow">
+        <button class="btn ghost sm" data-up="${i}" ${i===0?'disabled':''}>▲</button>
+        <button class="btn ghost sm" data-down="${i}" ${i===ord.length-1?'disabled':''}>▼</button>
+      </span>
+    </div>`).join("");
+  el.querySelectorAll("[data-up]").forEach(b=>b.onclick=()=>moveOrder(+b.dataset.up,-1));
+  el.querySelectorAll("[data-down]").forEach(b=>b.onclick=()=>moveOrder(+b.dataset.down,1));
+  el.querySelectorAll(".ord-item").forEach(it=>{
+    it.addEventListener("dragstart",()=>{ _dragOrderFrom=+it.dataset.i; it.classList.add("dragging"); });
+    it.addEventListener("dragend",()=>it.classList.remove("dragging"));
+    it.addEventListener("dragover",e=>e.preventDefault());
+    it.addEventListener("drop",e=>{ e.preventDefault(); reorderTo(_dragOrderFrom,+it.dataset.i); });
+  });
+}
+function moveOrder(i,dir){
+  const arr=state.settings.rohrOrder, j=i+dir;
+  if(j<0||j>=arr.length) return;
+  [arr[i],arr[j]]=[arr[j],arr[i]];
+  saveDB(); renderOrderList(); render();
+}
+function reorderTo(from,to){
+  if(from==null||from===to) return;
+  const arr=state.settings.rohrOrder;
+  const [m]=arr.splice(from,1); arr.splice(to,0,m);
+  saveDB(); renderOrderList(); render();
+}
+
+/* ---------------- Einheiten ---------------- */
+function addUnit(){
+  const v=val("newUnit").trim(); if(!v)return;
+  if(!state.einheiten.includes(v)) state.einheiten.push(v);
+  saveDB(); render();
+}
+function delUnit(u){
+  state.einheiten=state.einheiten.filter(x=>x!==u); saveDB(); render();
+}
+
+/* ---------------- Sichern / Wiederherstellen / Reset ---------------- */
+function exportJSON(){
+  const blob=new Blob([JSON.stringify(state,null,1)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=`lieferantenvergleich_${todayISO()}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+}
+function importJSON(file){
+  const r=new FileReader();
+  r.onload=()=>{ try{ const d=JSON.parse(r.result);
+      if(!d.lieferanten||!d.artikel){throw 0;}
+      state=normalize(d); saveDB(); render();
+      alert("Daten erfolgreich wiederhergestellt.");
+    }catch(e){ alert("Datei konnte nicht gelesen werden."); } };
+  r.readAsText(file);
+}
+
+/* ---------------- Utils ---------------- */
+function val(id){ return document.getElementById(id).value; }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+
+/* ---------------- Desktop-App: Update-Prüfung (Variante A) ----------------
+   Fragt bei Start und per Button die neueste Version bei GitHub ab und zeigt
+   bei einer neueren Version einen Hinweis mit Download-Link. */
+const GITHUB_REPO="DEIN-GITHUB-NAME/Lieferantenvergleich"; // <-- hier euren GitHub-Pfad eintragen (z. B. "wiskirchen/Lieferantenvergleich")
+let APP_VERSION="1.0.0"; // wird in der Desktop-App durch die echte App-Version ersetzt
+function currentVersion(){ return APP_VERSION; }
+function isDesktop(){ return !!(window.appAPI && window.appAPI.isDesktop); }
+function openExternal(url){ if(window.appAPI&&window.appAPI.openExternal) window.appAPI.openExternal(url); else window.open(url,"_blank"); }
+// Versionsvergleich "1.2.0" vs "1.10.0" -> >0 wenn a neuer als b
+function cmpVer(a,b){
+  const pa=String(a).split(".").map(n=>parseInt(n,10)||0), pb=String(b).split(".").map(n=>parseInt(n,10)||0);
+  for(let i=0;i<Math.max(pa.length,pb.length);i++){ const d=(pa[i]||0)-(pb[i]||0); if(d) return d; }
+  return 0;
+}
+async function checkForUpdate(manual){
+  const st=document.getElementById("updStatus");
+  if(GITHUB_REPO.startsWith("DEIN-GITHUB-NAME")){ if(manual&&st) st.textContent="Hinweis: GitHub-Pfad in der App noch nicht eingetragen."; return; }
+  if(manual&&st) st.textContent="Suche nach Update …";
+  try{
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,{headers:{"Accept":"application/vnd.github+json"}});
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const rel=await res.json();
+    const latest=(rel.tag_name||"").replace(/^v/i,"");
+    const cur=currentVersion();
+    if(latest && cmpVer(latest,cur)>0){
+      showUpdateBanner(latest, rel.html_url||`https://github.com/${GITHUB_REPO}/releases/latest`);
+      if(st) st.textContent=`Neue Version ${latest} verfügbar.`;
+    } else if(manual && st){
+      st.textContent=`Sie verwenden die aktuelle Version (${cur}).`;
+    }
+  }catch(e){
+    if(manual && st) st.textContent="Update-Prüfung nicht möglich (keine Internetverbindung?).";
+  }
+}
+function showUpdateBanner(ver,url){
+  const bar=document.getElementById("updatebar");
+  bar.innerHTML=`<span>🔔 Neue Version <strong>${esc(ver)}</strong> verfügbar.</span>`+
+    `<button class="btn sm" id="updDl">Herunterladen</button>`+
+    `<button class="btn ghost sm" id="updX" title="Ausblenden">✕</button>`;
+  bar.classList.add("show");
+  document.getElementById("updDl").onclick=()=>openExternal(url);
+  document.getElementById("updX").onclick=()=>bar.classList.remove("show");
+}
+async function initDesktop(){
+  if(window.appAPI && window.appAPI.getVersion){ try{ APP_VERSION=await window.appAPI.getVersion(); }catch(e){} }
+  checkForUpdate(false); // stille Prüfung beim Start
+}
+
+/* ---------------- Init ---------------- */
+let _rt=null, _lastWide=window.innerWidth>=760;
+window.addEventListener("resize",()=>{
+  clearTimeout(_rt);
+  _rt=setTimeout(()=>{
+    const wide=window.innerWidth>=760;
+    if(view==="vergleich" && vState.layout==="auto" && wide!==_lastWide) refreshVergleich();
+    _lastWide=wide;
+  },180);
+});
+state=loadDB();
+document.getElementById("btnExport").onclick=exportJSON;
+document.getElementById("btnImport").onclick=()=>document.getElementById("importFile").click();
+document.getElementById("importFile").onchange=e=>{if(e.target.files[0])importJSON(e.target.files[0]);};
+// Theme
+applyTheme();
+document.getElementById("themeSel").onchange=e=>{localStorage.setItem("lv_theme",e.target.value); applyTheme();};
+if(window.matchMedia){ matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>{
+  if((localStorage.getItem("lv_theme")||"auto")==="auto") applyTheme(); }); }
+render();
+initDesktop();
+</script>
+
+<script>
+/* ---------------- Geräte-Vorschau: Auto / Handy / Tablet / Desktop ----------------
+   Zeigt die App in einem auf die Gerätebreite gesetzten, skalierten iFrame,
+   damit die echten CSS-Media-Queries greifen. Im Frame selbst (?frame=1) inaktiv. */
+(function(){
+  var inFrame = new URLSearchParams(location.search).get("frame")==="1";
+  if(inFrame) return;
+  var DEVICES=[
+    {id:"auto",   label:"Auto"},
+    {id:"handy",  label:"Handy",   w:390,  h:844},
+    {id:"tablet", label:"Tablet",  w:768,  h:1024},
+    {id:"desktop",label:"Desktop", w:1280, h:800},
+  ];
+  var bar=document.createElement("div");
+  bar.className="devbar";
+  bar.innerHTML='<span class="devbar-lbl">Geräte-Vorschau</span>'+
+    DEVICES.map(function(d){return '<button type="button" data-dev="'+d.id+'">'+d.label+
+      (d.w?'<small>'+d.w+'px</small>':'')+'</button>';}).join("");
+  document.body.appendChild(bar);
+  var overlay=null;
+  function fit(d){
+    if(!overlay) return;
+    var scaler=overlay.querySelector(".dev-scaler"), frame=overlay.querySelector(".dev-frame"),
+        iframe=overlay.querySelector("iframe"), head=overlay.querySelector(".dev-head");
+    iframe.style.width=d.w+"px"; iframe.style.height=d.h+"px";
+    var bezel=14, fullW=d.w+bezel, fullH=d.h+bezel;
+    var availW=window.innerWidth-44, availH=window.innerHeight-150;
+    var scale=Math.min(1, availW/fullW, availH/fullH);
+    frame.style.transform="scale("+scale+")"; frame.style.transformOrigin="top left";
+    scaler.style.width=(fullW*scale)+"px"; scaler.style.height=(fullH*scale)+"px";
+    head.textContent=d.label+" · "+d.w+" × "+d.h+" px"+(scale<1?" · "+Math.round(scale*100)+" %":"");
+  }
+  function setDevice(id){
+    var d=DEVICES.find(function(x){return x.id===id;})||DEVICES[0];
+    localStorage.setItem("lv_devPreview",d.id);
+    bar.querySelectorAll("button").forEach(function(b){b.classList.toggle("active",b.dataset.dev===d.id);});
+    if(!d.w){ if(overlay){overlay.remove();overlay=null;} return; }
+    if(!overlay){
+      overlay=document.createElement("div");
+      overlay.className="dev-overlay";
+      overlay.innerHTML='<div class="dev-stage"><div class="dev-head"></div>'+
+        '<div class="dev-scaler"><div class="dev-frame"><iframe title="Geräte-Vorschau" src="'+
+        location.pathname+'?frame=1"></iframe></div></div></div>';
+      document.body.appendChild(overlay);
+    }
+    fit(d);
+  }
+  bar.addEventListener("click",function(e){var b=e.target.closest("button"); if(b) setDevice(b.dataset.dev);});
+  window.addEventListener("resize",function(){
+    var cur=DEVICES.find(function(x){return x.id===localStorage.getItem("lv_devPreview");});
+    if(cur&&cur.w) fit(cur);
+  });
+  setDevice(localStorage.getItem("lv_devPreview")||"auto");
+})();
+</script>
+</body>
+</html>
